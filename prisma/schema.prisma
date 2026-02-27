@@ -1,0 +1,358 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id                  String    @id @default(uuid())
+  correo              String    @unique
+  password            String
+  nombre_completo     String?
+  dni_foto_url        String?
+  selfie_url          String?
+  esta_verificado     Boolean   @default(false)
+  url_foto_perfil     String?
+  modo_actual         String    @default("VENDEDOR") // VENDEDOR o ARRENDATARIO
+  fecha_creacion      DateTime  @default(now())
+  fecha_actualizacion DateTime  @updatedAt
+  fecha_eliminacion   DateTime? // Borrado lógico
+
+  // Relaciones
+  garajes             Garaje[]
+  reservas_compradas  Reserva[] @relation("vendedor")
+  mensajes_enviados   Mensaje[]
+  calificaciones_hechas Calificacion[] @relation("autor")
+  calificaciones_recibidas Calificacion[] @relation("objetivo")
+  notificaciones      Notificacion[]
+  logs_auditoria      LogAuditoria[]
+  billetera           Billetera?
+  solicitudes_retiro  SolicitudRetiro[]
+  tickets_reportados  TicketSoporte[]   @relation("reportador")
+}
+
+model Garaje {
+  id                  String    @id @default(uuid())
+  id_dueno            String
+  nombre              String
+  descripcion         String?
+  direccion           String?
+  latitud             Float?
+  longitud            Float?
+  precio_hora         Decimal?  @db.Decimal(10, 2)
+  precio_dia          Decimal?  @db.Decimal(10, 2)
+  minimo_horas        Int       @default(1)
+  tiempo_limpieza     Int       @default(0) // en minutos
+  
+  tiene_wifi          Boolean   @default(false)
+  tiene_bano          Boolean   @default(false) // renombrado de tiene_baño para evitar ñ
+  tiene_electricidad  Boolean   @default(false)
+  tiene_mesa          Boolean   @default(false)
+  
+  fecha_creacion      DateTime  @default(now())
+  fecha_actualizacion DateTime  @updatedAt
+
+  // Relaciones
+  dueno               Usuario   @relation(fields: [id_dueno], references: [id])
+  imagenes            ImagenGaraje[]
+  horarios_semanales  HorarioSemanal[]
+  fechas_bloqueadas   FechaBloqueada[]
+  servicios_adicionales ServicioAdicional[]
+  reservas            Reserva[]
+}
+
+model ImagenGaraje {
+  id                  String    @id @default(uuid())
+  id_garaje           String
+  url                 String
+  fecha_creacion      DateTime  @default(now())
+
+  // Relaciones
+  garaje              Garaje    @relation(fields: [id_garaje], references: [id])
+}
+
+model HorarioSemanal {
+  id                  String    @id @default(uuid())
+  id_garaje           String
+  dia_semana          Int       // 0=Dom, 1=Lun, 2=Mar, 3=Mie, 4=Jue, 5=Vie, 6=Sab
+  abierto             Boolean   @default(true)
+  hora_inicio         String    @default("08:00") // Formato "HH:mm"
+  hora_fin            String    @default("20:00")
+
+  // Relaciones
+  garaje              Garaje    @relation(fields: [id_garaje], references: [id])
+}
+
+model FechaBloqueada {
+  id                  String    @id @default(uuid())
+  id_garaje           String
+  fecha               DateTime  @db.Date
+  motivo              String?
+
+  // Relaciones
+  garaje              Garaje    @relation(fields: [id_garaje], references: [id])
+}
+
+model ServicioAdicional {
+  id                  String    @id @default(uuid())
+  id_garaje           String
+  nombre              String
+  precio              Decimal   @db.Decimal(10, 2)
+  es_por_dia          Boolean   @default(true)
+
+  // Relaciones
+  garaje              Garaje    @relation(fields: [id_garaje], references: [id])
+  reservas            ReservaServicioExtra[]
+}
+
+model CategoriaProducto {
+  id                  Int       @id @default(autoincrement())
+  nombre              String
+
+  // Relaciones
+  reservas            ReservaCategoria[]
+}
+
+model Reserva {
+  id                  String    @id @default(uuid())
+  id_garaje           String
+  id_vendedor         String
+  estado              String    @default("PENDIENTE") // PENDIENTE, ACEPTADA, PAGADA, EN_CURSO, COMPLETADA, CANCELADA, EN_DISPUTA, REEMBOLSADA
+  tipo_cobro          String?   // POR_HORA o POR_DIA
+  precio_total        Decimal?  @db.Decimal(10, 2)
+  comision_app        Decimal?  @db.Decimal(10, 2)
+  monto_dueno         Decimal?  @db.Decimal(10, 2)
+  mensaje_inicial     String?
+  acepto_terminos_responsabilidad Boolean @default(false)
+  version_terminos    String?
+  ip_aceptacion       String?
+  fecha_creacion      DateTime  @default(now())
+  fecha_actualizacion DateTime  @updatedAt
+
+  // Relaciones
+  garaje              Garaje    @relation(fields: [id_garaje], references: [id])
+  vendedor            Usuario   @relation("vendedor", fields: [id_vendedor], references: [id])
+  fechas              FechaReserva[]
+  comprobante_pago    ComprobantePago?
+  mensajes            Mensaje[]
+  calificaciones      Calificacion[]
+  categorias          ReservaCategoria[]
+  servicios_extra     ReservaServicioExtra[]
+  solicitudes_cambio  SolicitudCambioReserva[]
+  movimientos_billetera MovimientoBilletera[]
+  tickets_soporte     TicketSoporte[]
+}
+
+model FechaReserva {
+  id                  String    @id @default(uuid())
+  id_reserva          String
+  fecha               DateTime  @db.Date
+  hora_inicio         String    // Formato "HH:mm"
+  hora_fin            String
+  hora_checkin_real   DateTime?
+  hora_checkout_real  DateTime?
+  estado              String    @default("PROGRAMADA") // PROGRAMADA, EN_CURSO, COMPLETADA, CANCELADA
+
+  // Relaciones
+  reserva             Reserva   @relation(fields: [id_reserva], references: [id])
+  evidencias          EvidenciaReserva[]
+}
+
+model EvidenciaReserva {
+  id                  String    @id @default(uuid())
+  id_fecha_reserva    String
+  tipo_momento        String    // CHECK_IN o CHECK_OUT
+  url_foto            String
+  comentarios         String?
+  fecha_subida        DateTime  @default(now())
+
+  // Relaciones
+  fecha_reserva       FechaReserva @relation(fields: [id_fecha_reserva], references: [id])
+}
+
+model ReservaCategoria {
+  id_reserva          String
+  id_categoria        Int
+
+  // Relaciones
+  reserva             Reserva   @relation(fields: [id_reserva], references: [id])
+  categoria           CategoriaProducto @relation(fields: [id_categoria], references: [id])
+
+  @@id([id_reserva, id_categoria])
+}
+
+model ReservaServicioExtra {
+  id_reserva          String
+  id_servicio         String
+  cantidad            Int       @default(1)
+  precio_acordado     Decimal   @db.Decimal(10, 2)
+
+  // Relaciones
+  reserva             Reserva   @relation(fields: [id_reserva], references: [id])
+  servicio            ServicioAdicional @relation(fields: [id_servicio], references: [id])
+
+  @@id([id_reserva, id_servicio])
+}
+
+model SolicitudCambioReserva {
+  id                  String    @id @default(uuid())
+  id_reserva          String
+  solicitado_por_id   String
+  nuevo_precio        Decimal?  @db.Decimal(10, 2)
+  motivo              String?
+  estado              String    @default("PENDIENTE") // PENDIENTE, ACEPTADO, RECHAZADO
+  fecha_creacion      DateTime  @default(now())
+
+  // Relaciones
+  reserva             Reserva   @relation(fields: [id_reserva], references: [id])
+}
+
+model ComprobantePago {
+  id                  String    @id @default(uuid())
+  id_reserva          String    @unique
+  metodo              String    // QR o TARJETA
+  url_imagen          String?
+  id_transaccion      String?
+  estado              String    @default("EN_REVISION") // EN_REVISION, APROBADO, RECHAZADO
+  fecha_creacion      DateTime  @default(now())
+
+  // Relaciones
+  reserva             Reserva   @relation(fields: [id_reserva], references: [id])
+}
+
+model Mensaje {
+  id                  String    @id @default(uuid())
+  id_reserva          String
+  id_emisor           String
+  contenido           String
+  fecha_creacion      DateTime  @default(now())
+
+  // Relaciones
+  reserva             Reserva   @relation(fields: [id_reserva], references: [id])
+  emisor              Usuario   @relation(fields: [id_emisor], references: [id])
+  adjuntos            AdjuntoMensaje[]
+}
+
+model AdjuntoMensaje {
+  id                  String    @id @default(uuid())
+  id_mensaje          String
+  url                 String
+  tipo                String    @default("IMAGEN")
+
+  // Relaciones
+  mensaje             Mensaje   @relation(fields: [id_mensaje], references: [id])
+}
+
+model Calificacion {
+  id                  String    @id @default(uuid())
+  id_reserva          String
+  id_autor            String
+  id_objetivo         String
+  tipo_objetivo       String?   // USUARIO o GARAJE
+  puntuacion          Int
+  comentario          String?
+  fecha_creacion      DateTime  @default(now())
+
+  // Relaciones
+  reserva             Reserva   @relation(fields: [id_reserva], references: [id])
+  autor               Usuario   @relation("autor", fields: [id_autor], references: [id])
+  objetivo            Usuario   @relation("objetivo", fields: [id_objetivo], references: [id])
+}
+
+model Billetera {
+  id                  String    @id @default(uuid())
+  id_usuario          String    @unique
+  saldo_disponible    Decimal   @default(0.00) @db.Decimal(10, 2)
+  saldo_retenido      Decimal   @default(0.00) @db.Decimal(10, 2)
+  fecha_actualizacion DateTime  @updatedAt
+
+  // Relaciones
+  usuario             Usuario   @relation(fields: [id_usuario], references: [id])
+  movimientos         MovimientoBilletera[]
+}
+
+model MovimientoBilletera {
+  id                  String    @id @default(uuid())
+  id_billetera        String
+  id_reserva          String?
+  tipo                String    // INGRESO, RETENCION, LIBERACION, REEMBOLSO, COMISION_APP, RETIRO
+  monto               Decimal   @db.Decimal(10, 2)
+  descripcion         String?
+  fecha_creacion      DateTime  @default(now())
+
+  // Relaciones
+  billetera           Billetera @relation(fields: [id_billetera], references: [id])
+  reserva             Reserva?  @relation(fields: [id_reserva], references: [id])
+}
+
+model SolicitudRetiro {
+  id                  String    @id @default(uuid())
+  id_usuario          String
+  monto               Decimal   @db.Decimal(10, 2)
+  banco_destino       String?
+  cuenta_destino      String?
+  estado              String    @default("PENDIENTE")
+  url_comprobante     String?
+  fecha_solicitud     DateTime  @default(now())
+  fecha_procesado     DateTime?
+
+  // Relaciones
+  usuario             Usuario   @relation(fields: [id_usuario], references: [id])
+}
+
+model TicketSoporte {
+  id                  String    @id @default(uuid())
+  id_reserva          String
+  id_reportador       String
+  tipo_problema       String?
+  descripcion_urgente String?
+  estado              String    @default("ABIERTO") // ABIERTO, EN_REVISION, CERRADO_A_FAVOR_VENDEDOR, CERRADO_A_FAVOR_DUENO
+  resolucion_admin    String?
+  fecha_creacion      DateTime  @default(now())
+  fecha_cierre        DateTime?
+
+  // Relaciones
+  reserva             Reserva   @relation(fields: [id_reserva], references: [id])
+  reportador          Usuario   @relation("reportador", fields: [id_reportador], references: [id])
+}
+
+model ConfiguracionPlataforma {
+  id                  Int       @id @default(autoincrement())
+  clave               String    @unique // Ej: PORCENTAJE_COMISION_APP
+  valor               String
+  descripcion         String?
+  fecha_actualizacion DateTime  @updatedAt
+}
+
+model Notificacion {
+  id                  String    @id @default(uuid())
+  id_usuario          String
+  titulo              String
+  cuerpo              String?
+  leido               Boolean   @default(false)
+  fecha_creacion      DateTime  @default(now())
+
+  // Relaciones
+  usuario             Usuario   @relation(fields: [id_usuario], references: [id])
+}
+
+model LogAuditoria {
+  id                  String    @id @default(uuid())
+  id_usuario          String
+  accion              String
+  entidad             String
+  id_entidad          String
+  datos_previos       Json?
+  datos_nuevos        Json?
+  ip_conexion         String?
+  fecha_creacion      DateTime  @default(now())
+
+  // Relaciones
+  usuario             Usuario   @relation(fields: [id_usuario], references: [id])
+}
