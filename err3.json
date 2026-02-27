@@ -1,0 +1,1 @@
+{"err":"Loaded Prisma config from prisma.config.ts.\n\nPrisma schema loaded from prisma\\schema.prisma.\nError: The datasource.url property is required in your Prisma config file when using prisma db push.\n"}
