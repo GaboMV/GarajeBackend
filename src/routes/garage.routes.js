@@ -10,6 +10,7 @@ const {
 } = require('../controllers/garage.controller');
 
 const { requireAuth, requireVerifiedKYC } = require('../middlewares/auth.middleware');
+const upload = require('../middlewares/upload.middleware');
 
 // Todas estas rutas requieren estar autenticado y verificado
 router.use(requireAuth);
@@ -22,6 +23,6 @@ router.post('/', createGaraje);
 router.post('/:idGaraje/horarios', addHorario);
 router.post('/:idGaraje/servicios', addServicioAdicional);
 router.post('/:idGaraje/bloquear-fecha', blockDate);
-router.post('/:idGaraje/imagenes', addImagen);
+router.post('/:idGaraje/imagenes', upload.single('imagen'), addImagen);
 
 module.exports = router;

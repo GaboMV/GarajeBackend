@@ -1,4 +1,5 @@
 const prisma = require('../db/prisma');
+const { uploadFile } = require('../services/upload.service');
 
 /**
  * 1. Crear un nuevo Garaje
@@ -155,13 +156,19 @@ const addImagen = async (req, res, next) => {
     try {
         const id_dueno = req.user.id;
         const { idGaraje } = req.params;
-        const { url } = req.body;
 
         // Validar propiedad
         const garaje = await prisma.garaje.findUnique({ where: { id: idGaraje } });
         if (!garaje || garaje.id_dueno !== id_dueno) {
             return res.status(403).json({ error: 'No tienes permisos sobre este garaje' });
         }
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se envió ninguna imagen' });
+        }
+
+        // Subimos a R2 en la carpeta 'garajes'
+        const url = await uploadFile(req.file, 'garajes');
 
         const imagen = await prisma.imagenGaraje.create({
             data: {
