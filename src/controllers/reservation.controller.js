@@ -20,11 +20,48 @@ const createReservation = async (req, res, next) => {
 
         const garaje = await prisma.garaje.findUnique({
             where: { id: id_garaje },
-            include: { servicios_adicionales: true }
+            include: {
+                servicios_adicionales: true,
+                reservas: {
+                    include: { fechas: true },
+                    where: { estado: { notIn: ['CANCELADA', 'REEMBOLSADA'] } }
+                }
+            }
         });
 
         if (!garaje) {
             return res.status(404).json({ error: 'Garaje no encontrado' });
+        }
+
+        // --- VALIDACIÓN DE CAPACIDAD MULTIVARIADA ---
+        let reservasSolapadas = 0;
+        const timeToMinutes = (timeStr) => {
+            const [h, m] = timeStr.split(':').map(Number);
+            return (h * 60) + m;
+        };
+        const searchStartMin = timeToMinutes(hora_inicio);
+        const searchEndMin = timeToMinutes(hora_fin);
+
+        garaje.reservas.forEach(reserva => {
+            let reservaChoca = false;
+            reserva.fechas.forEach(fr => {
+                if (fr.fecha.toISOString().split('T')[0] === fecha) {
+                    const resStartMin = timeToMinutes(fr.hora_inicio);
+                    const resEndMin = timeToMinutes(fr.hora_fin) + garaje.tiempo_limpieza;
+
+                    if (searchStartMin < resEndMin && searchEndMin > resStartMin) {
+                        reservaChoca = true;
+                    }
+                }
+            });
+
+            if (reservaChoca) {
+                reservasSolapadas++;
+            }
+        });
+
+        if (reservasSolapadas >= garaje.capacidad_puestos) {
+            return res.status(400).json({ error: 'El garaje ha alcanzado su capacidad máxima para este horario.' });
         }
 
         // --- CALCULO FINANCIERO SIMPLE ---

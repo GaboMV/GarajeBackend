@@ -1,71 +1,120 @@
-const supabase = require('../config/supabase');
+const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const path = require('path');
 const crypto = require('crypto');
 
-const BUCKET_NAME = process.env.SUPABASE_BUCKET_NAME || 'garajes';
+// Inicializar cliente S3 para Cloudflare R2
+const s3Client = new S3Client({
+    region: 'auto',
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    },
+});
+
+const BUCKET_PUBLIC = process.env.R2_BUCKET_PUBLIC || 'garajes-public';
+const BUCKET_PRIVATE = process.env.R2_BUCKET_PRIVATE || 'garajes-kyc';
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL; // Solo para garajes
 
 /**
- * Sube un archivo a Supabase Storage
- * @param {Object} file Objeto de archivo provisto por multer
- * @param {String} folder Carpeta destino (ej: 'fotos')
- * @returns {Promise<String>} URL del archivo subido
+ * 1. Subida a bucket PÚBLICO (Garajes)
+ * Retorna URL completa accesible por todos.
  */
-const uploadFile = async (file, folder = 'general') => {
+const uploadFilePublic = async (file, folder = 'general') => {
     if (!file) return null;
 
     const fileExtension = path.extname(file.originalname);
     const fileName = `${folder}/${crypto.randomUUID()}${fileExtension}`;
 
-    // Subir a Supabase
-    const { data, error } = await supabase.storage
-        .from(BUCKET_NAME)
-        .upload(fileName, file.buffer, {
-            contentType: file.mimetype,
-            upsert: false // no sobreescribir
-        });
+    const command = new PutObjectCommand({
+        Bucket: BUCKET_PUBLIC,
+        Key: fileName,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+    });
 
-    if (error) {
-        throw new Error(`Error subiendo archivo a Supabase: ${error.message}`);
+    await s3Client.send(command);
+
+    if (R2_PUBLIC_URL) {
+        return `${R2_PUBLIC_URL}/${fileName}`;
     }
 
-    // Obtener URL Pública de la imagen subida
-    const { data: publicData } = supabase.storage
-        .from(BUCKET_NAME)
-        .getPublicUrl(fileName);
-
-    return publicData.publicUrl;
+    return `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${BUCKET_PUBLIC}/${fileName}`;
 };
 
 /**
- * Elimina un archivo de Supabase Storage
- * @param {String} fileUrl URL completa del archivo público
+ * 2. Subida a bucket PRIVADO (KYC - Carnets/Selfies)
+ * Retorna solo la KEY del objeto, ya que no hay URL pública.
  */
-const deleteFile = async (fileUrl) => {
+const uploadFilePrivate = async (file, folder = 'general') => {
+    if (!file) return null;
+
+    const fileExtension = path.extname(file.originalname);
+    const fileName = `${folder}/${crypto.randomUUID()}${fileExtension}`;
+
+    const command = new PutObjectCommand({
+        Bucket: BUCKET_PRIVATE,
+        Key: fileName,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+    });
+
+    await s3Client.send(command);
+
+    // Guardamos solo el ID (key) en la BD, no una URL completa.
+    return fileName;
+};
+
+/**
+ * 3. Obtener URL Firmada del bucket privado (Expira en 5 minutos)
+ * Esto lo usará el controlador cuando el Admin quiera ver los documentos KYC.
+ */
+const getDynamicPresignedUrl = async (key) => {
+    if (!key) return null;
+
+    // Generar URL firmada solo lectura para la app o el panel Admin
+    const command = new GetObjectCommand({
+        Bucket: BUCKET_PRIVATE,
+        Key: key,
+    });
+
+    // 300 segundos = 5 minutos de validez
+    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+    return signedUrl;
+};
+
+/**
+ * 4. Eliminar archivo (Bucket Público, usado en Garajes)
+ */
+const deleteFilePublic = async (fileUrl) => {
     try {
         if (!fileUrl) return;
 
-        // Extraer el Key desde la URL pública
-        // Ejemplo: https://xyz.supabase.co/storage/v1/object/public/garajes/fotos/123.jpg
-        // Queremos "fotos/123.jpg" si el bucket es "garajes"
-
-        const urlParts = fileUrl.split(`/public/${BUCKET_NAME}/`);
-        if (urlParts.length !== 2) return; // No es una URL válida
-
-        const filePath = urlParts[1];
-
-        const { error } = await supabase.storage
-            .from(BUCKET_NAME)
-            .remove([filePath]);
-
-        if (error) {
-            console.error("Error al eliminar archivo de Supabase:", error.message);
+        let keyText = fileUrl;
+        if (R2_PUBLIC_URL && fileUrl.startsWith(R2_PUBLIC_URL)) {
+            keyText = fileUrl.replace(`${R2_PUBLIC_URL}/`, '');
+        } else {
+            const r2Host = `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${BUCKET_PUBLIC}/`;
+            if (fileUrl.startsWith(r2Host)) {
+                keyText = fileUrl.replace(r2Host, '');
+            }
         }
+
+        const command = new DeleteObjectCommand({
+            Bucket: BUCKET_PUBLIC,
+            Key: keyText,
+        });
+
+        await s3Client.send(command);
     } catch (error) {
-        console.error("Excepción en deleteFile:", error);
+        console.error("Error al eliminar el archivo de R2 Público:", error);
     }
 }
 
 module.exports = {
-    uploadFile,
-    deleteFile
+    uploadFilePublic,
+    uploadFilePrivate,
+    getDynamicPresignedUrl,
+    deleteFilePublic
 };

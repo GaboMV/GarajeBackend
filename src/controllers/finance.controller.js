@@ -1,26 +1,40 @@
 const prisma = require('../db/prisma');
 
 /**
- * 1. Consultar Saldo (Dueño)
+ * 1. Consultar Saldo (Dueño) y Analítica
+ * Incluye Retenidos por reservas "EN_CURSO"
  */
 const getBalance = async (req, res, next) => {
     try {
         const id_usuario = req.user.id;
 
+        // 1. Obtener billetera actual
         const billetera = await prisma.billetera.findUnique({
             where: { id_usuario }
         });
 
-        if (!billetera) {
-            return res.json({
-                saldo_disponible: 0.00,
-                saldo_retenido: 0.00
-            });
-        }
+        // 2. Calcular saldos retenidos en Reservas "EN_CURSO" y "PAGADAS" que aún no liberan el dinero
+        const reservasRetenidas = await prisma.reserva.aggregate({
+            _sum: {
+                monto_dueno: true
+            },
+            where: {
+                garaje: { id_dueno: id_usuario },
+                estado: { in: ['PAGADA', 'EN_CURSO'] }
+            }
+        });
+
+        const en_proceso_reserva = reservasRetenidas._sum.monto_dueno || 0.00;
+        const saldo_disponible = billetera ? billetera.saldo_disponible : 0.00;
+        const saldo_retenido_billetera = billetera ? billetera.saldo_retenido : 0.00;
 
         res.json({
-            saldo_disponible: billetera.saldo_disponible,
-            saldo_retenido: billetera.saldo_retenido
+            saldo_disponible,
+            saldo_retenido: parseFloat(saldo_retenido_billetera) + parseFloat(en_proceso_reserva),
+            detalles: {
+                billetera_retenido: saldo_retenido_billetera,
+                reservas_en_curso: parseFloat(en_proceso_reserva)
+            }
         });
     } catch (error) {
         next(error);
