@@ -55,7 +55,7 @@ const searchGarajes = async (req, res, next) => {
             if (estaBloqueada) return false;
 
             // 3. ¿El rango choca con los bloques de FechaReserva sumando tiempo de limpieza?
-            let hayChoque = false;
+            let reservasSolapadas = 0;
 
             // Función auxiliar para convertir "HH:mm" a minutos para facilitar matemáticas
             const timeToMinutes = (timeStr) => {
@@ -67,24 +67,28 @@ const searchGarajes = async (req, res, next) => {
             const searchEndMin = timeToMinutes(hora_fin);
 
             garaje.reservas.forEach(reserva => {
+                // Verificar si esta reserva específica se solapa en la fecha pedida
+                let reservaChoca = false;
                 reserva.fechas.forEach(fr => {
                     if (fr.fecha.toISOString().split('T')[0] === fecha) {
-                        // Convertir hora reserva existente a minutos
                         const resStartMin = timeToMinutes(fr.hora_inicio);
                         // El fin de la reserva existente se expande por el tiempo de limpieza necesario
                         const resEndMin = timeToMinutes(fr.hora_fin) + garaje.tiempo_limpieza;
 
                         // Verificar Solapamiento:
-                        // Si mi búsqueda empieza antes de que el otro salga (con limpieza) 
-                        // Y mi búsqueda termina después de que el otro entró
                         if (searchStartMin < resEndMin && searchEndMin > resStartMin) {
-                            hayChoque = true;
+                            reservaChoca = true;
                         }
                     }
                 });
+
+                if (reservaChoca) {
+                    reservasSolapadas++;
+                }
             });
 
-            if (hayChoque) return false;
+            // Si hay tantas o más reservas solapadas que la capacidad del garaje, no está disponible
+            if (reservasSolapadas >= garaje.capacidad_puestos) return false;
 
             return true;
         });

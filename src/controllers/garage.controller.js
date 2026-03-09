@@ -1,5 +1,5 @@
 const prisma = require('../db/prisma');
-const { uploadFile } = require('../services/upload.service');
+const { uploadFilePublic } = require('../services/upload.service');
 
 /**
  * 1. Crear un nuevo Garaje
@@ -168,7 +168,7 @@ const addImagen = async (req, res, next) => {
         }
 
         // Subimos a R2 en la carpeta 'garajes'
-        const url = await uploadFile(req.file, 'garajes');
+        const url = await uploadFilePublic(req.file, 'garajes');
 
         const imagen = await prisma.imagenGaraje.create({
             data: {

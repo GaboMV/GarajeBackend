@@ -2,6 +2,7 @@
 const prisma = require('../db/prisma');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { uploadFilePrivate } = require('../services/upload.service');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret_garajes_dev_123';
 
@@ -58,15 +59,19 @@ const register = async (req, res, next) => {
  */
 const uploadKyc = async (req, res, next) => {
     try {
-        // Obtenemos el usuario autenticado desde el middleware
         const userId = req.user.id;
 
-        // Simulación: recibimos las URLs (en el mundo real se suben con Multer a S3 o localmente)
-        const { dni_foto_url, selfie_url } = req.body;
-
-        if (!dni_foto_url || !selfie_url) {
-            return res.status(400).json({ error: 'Debes proveer las URLs para DNI y Selfie' });
+        // Validar que se enviaron ambos archivos
+        if (!req.files || !req.files.dni_foto || !req.files.selfie) {
+            return res.status(400).json({ error: 'Debes subir ambas fotos: dni_foto y selfie' });
         }
+
+        const fileDni = req.files.dni_foto[0];
+        const fileSelfie = req.files.selfie[0];
+
+        // Subir a R2 Privado (bucket cerrado)
+        const dni_foto_url = await uploadFilePrivate(fileDni, 'kyc');
+        const selfie_url = await uploadFilePrivate(fileSelfie, 'kyc');
 
         const updatedUser = await prisma.usuario.update({
             where: { id: userId },
@@ -87,13 +92,41 @@ const uploadKyc = async (req, res, next) => {
     }
 }
 
+const { getDynamicPresignedUrl } = require('../services/upload.service');
+
+/**
+ * Admin: Get User KYC details (Genera Presigned URLs)
+ */
+const getUserKyc = async (req, res, next) => {
+    try {
+        const { idUsuario } = req.params;
+        const user = await prisma.usuario.findUnique({ where: { id: idUsuario } });
+
+        if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+        if (!user.dni_foto_url && !user.selfie_url) return res.status(400).json({ error: 'El usuario no tiene documentos KYC subidos.' });
+
+        const dniUrl = await getDynamicPresignedUrl(user.dni_foto_url);
+        const selfieUrl = await getDynamicPresignedUrl(user.selfie_url);
+
+        res.json({
+            usuario: user.correo,
+            estado: user.esta_verificado ? 'Aprobado' : 'Pendiente',
+            documentos_temporales_5min: {
+                dni_frontal: dniUrl,
+                selfie: selfieUrl
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
 /**
  * Admin: Approve User Verification
  * Un admin revisa las fotos y aprueba al usuario
  */
 const approveUser = async (req, res, next) => {
     try {
-        // Asuminos que la ruta tiene middleware que comprueba si req.user es Admin
         const { idUsuario } = req.params;
 
         const user = await prisma.usuario.findUnique({ where: { id: idUsuario } });
@@ -140,7 +173,7 @@ const login = async (req, res, next) => {
             return res.status(401).json({ error: 'Credenciales inválidas' });
         }
 
-        const token = jwt.sign({ id: user.id, correo: user.correo }, JWT_SECRET, {
+        const token = jwt.sign({ id: user.id, correo: user.correo, es_admin: user.es_admin }, JWT_SECRET, {
             expiresIn: '7d'
         });
 
@@ -163,6 +196,7 @@ const login = async (req, res, next) => {
 module.exports = {
     register,
     uploadKyc,
+    getUserKyc,
     approveUser,
     login
 };

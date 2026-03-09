@@ -18,6 +18,7 @@ model Usuario {
   dni_foto_url        String?
   selfie_url          String?
   esta_verificado     Boolean   @default(false)
+  es_admin            Boolean   @default(false)
   url_foto_perfil     String?
   modo_actual         String    @default("VENDEDOR") // VENDEDOR o ARRENDATARIO
   fecha_creacion      DateTime  @default(now())
@@ -49,6 +50,7 @@ model Garaje {
   precio_dia          Decimal?  @db.Decimal(10, 2)
   minimo_horas        Int       @default(1)
   tiempo_limpieza     Int       @default(0) // en minutos
+  capacidad_puestos   Int       @default(1) // Cuántos vendedores caben al mismo tiempo
   
   tiene_wifi          Boolean   @default(false)
   tiene_bano          Boolean   @default(false) // renombrado de tiene_baño para evitar ñ
@@ -65,6 +67,7 @@ model Garaje {
   fechas_bloqueadas   FechaBloqueada[]
   servicios_adicionales ServicioAdicional[]
   reservas            Reserva[]
+  politica_cancelacion PoliticaCancelacion?
 }
 
 model ImagenGaraje {
@@ -109,6 +112,18 @@ model ServicioAdicional {
   // Relaciones
   garaje              Garaje    @relation(fields: [id_garaje], references: [id])
   reservas            ReservaServicioExtra[]
+}
+
+model PoliticaCancelacion {
+  id                  String    @id @default(uuid())
+  id_garaje           String    @unique
+  tipo                String    // FLEXIBLE, MODERADA, ESTRICTA
+  reembolso_24h       Decimal   @db.Decimal(5, 2) // Porcentaje de reembolso (ej. 100.00, 50.00)
+  reembolso_mismo_dia Decimal   @db.Decimal(5, 2)
+  fecha_actualizacion DateTime  @updatedAt
+
+  // Relaciones
+  garaje              Garaje    @relation(fields: [id_garaje], references: [id])
 }
 
 model CategoriaProducto {
