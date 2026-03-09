@@ -8,12 +8,64 @@ router.use(requireAuth);
 router.use(requireVerifiedKYC);
 
 // Flujo 6: Botón de Pánico
+/**
+ * @swagger
+ * /api/support/reservas/{idReserva}/disputa:
+ *   post:
+ *     summary: Report an issue/dispute for a reservation
+ *     tags: [Support]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: idReserva
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Issue reported successfully
+ */
 router.post('/reservas/:idReserva/disputa', reportIssue);
 
-// Resolución por el Admin
+/**
+ * @swagger
+ * /api/support/tickets/{idTicket}/resolver:
+ *   post:
+ *     summary: Resolve a support ticket (Admin only)
+ *     tags: [Support]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: idTicket
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Ticket resolved successfully
+ */
 router.post('/tickets/:idTicket/resolver', requireAdmin, resolveTicket);
 
-// Flujo 7: Calificaciones
+/**
+ * @swagger
+ * /api/support/reservas/{idReserva}/calificar:
+ *   post:
+ *     summary: Rate the experience for a reservation
+ *     tags: [Support]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: idReserva
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Experience rated successfully
+ */
 router.post('/reservas/:idReserva/calificar', rateExperience);
 
 module.exports = router;
