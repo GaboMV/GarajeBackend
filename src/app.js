@@ -12,9 +12,15 @@ const operationRoutes = require('./routes/operation.routes');
 const financeRoutes = require('./routes/finance.routes');
 const supportRoutes = require('./routes/support.routes');
 
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./swagger.config');
+
 // Middlewares
 app.use(cors());
 app.use(express.json());
+
+// Swagger Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Main Router Configuration
 app.use('/api/users', userRoutes);
