@@ -13,6 +13,7 @@ const reservationRoutes = require('./routes/reservation.routes');
 const operationRoutes = require('./routes/operation.routes');
 const financeRoutes = require('./routes/finance.routes');
 const supportRoutes = require('./routes/support.routes');
+const chatRoutes = require('./routes/chat.routes');
 
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger.config');
@@ -56,6 +57,7 @@ app.use('/api/reservations', reservationRoutes);
 app.use('/api/operations', operationRoutes);
 app.use('/api/finances', financeRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Routes (to be added)
 app.get('/health', (req, res) => {

@@ -152,7 +152,88 @@ async function runTests() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const dataSearch = await resSearch.json();
-        console.log(`Estado: ${resSearch.status}`, dataSearch.error || `Ok, ${dataSearch.length} garajes`);
+        console.log(`Estado: ${resSearch.status}`, dataSearch.error || `Ok, ${dataSearch.total_encontrados ?? 0} garajes`);
+
+        // --- FLUJO DE RESERVA (necesaria para el chat) ---
+        console.log("\n--- FLUJO DE RESERVA ---");
+        console.log("\n[9] Probando: POST /reservations");
+        const resReserva = await fetch(`${BASE_URL}/reservations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+                id_garaje: garajeId,
+                fecha: '2027-08-15',
+                hora_inicio: '09:00',
+                hora_fin: '13:00',
+                mensaje_inicial: 'Quiero reservar un puesto.',
+                acepto_terminos_responsabilidad: true
+            })
+        });
+        const dataReserva = await resReserva.json();
+        console.log(`Estado: ${resReserva.status}`, dataReserva.error || dataReserva.message);
+        const reservaId = dataReserva.reserva?.id;
+
+        // --- FLUJO DE CHAT ---
+        console.log("\n--- FLUJO DE CHAT (REST + Socket.io) ---");
+
+        // [10] Presigned URL para adjunto
+        console.log("\n[10] Probando: POST /chat/presigned-url");
+        const resPresigned = await fetch(`${BASE_URL}/chat/presigned-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+            body: JSON.stringify({ contentType: 'image/jpeg' })
+        });
+        const dataPresigned = await resPresigned.json();
+        console.log(`Estado: ${resPresigned.status}`, dataPresigned.error || (dataPresigned.uploadUrl ? 'Presigned URL generada ✅' : 'Error'));
+
+        if (reservaId) {
+            // [11] Historial mensajes (vacío inicialmente)
+            console.log("\n[11] Probando: GET /chat/:id/mensajes");
+            const resHist = await fetch(`${BASE_URL}/chat/${reservaId}/mensajes`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const dataHist = await resHist.json();
+            console.log(`Estado: ${resHist.status}`, dataHist.error || `${dataHist.mensajes?.length ?? 0} mensajes en historial`);
+
+            // [12] Chat en tiempo real via Socket.io
+            console.log("\n[12] Probando: Socket.io — join_room + send_message + receive_message");
+            const { io } = require('socket.io-client');
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+            const socketA = io('http://localhost:3000', { auth: { token }, transports: ['websocket'] });
+            const socketB = io('http://localhost:3000', { auth: { token: adminToken }, transports: ['websocket'] });
+
+            let received = [];
+            socketA.on('receive_message', (msg) => received.push({ para: 'A', msg }));
+            socketB.on('receive_message', (msg) => received.push({ para: 'B', msg }));
+            socketA.on('error', (e) => console.log('  Socket A error:', e.message));
+            socketB.on('error', (e) => console.log('  Socket B error:', e.message));
+
+            await sleep(800);
+            socketA.emit('join_room', { reservaId });
+            socketB.emit('join_room', { reservaId });
+            await sleep(800);
+
+            socketA.emit('send_message', { reservaId, contenido: 'Hola desde Socket Test A' });
+            await sleep(1500);
+            socketB.emit('send_message', { reservaId, contenido: 'Respuesta desde Socket Test B' });
+            await sleep(1500);
+
+            socketA.disconnect();
+            socketB.disconnect();
+
+            // Verificar que los mensajes persistieron en BD
+            const resHist2 = await fetch(`${BASE_URL}/chat/${reservaId}/mensajes`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const dataHist2 = await resHist2.json();
+
+            console.log(`  -> Eventos receive_message capturados: ${received.length} (esperado: 4 — 2 msg × 2 sockets)`);
+            console.log(`  -> Mensajes persistidos en BD: ${dataHist2.mensajes?.length} (esperado: 2)`);
+            console.log(`  -> ${received.length >= 4 && dataHist2.mensajes?.length >= 2 ? '🎉 CHAT 100% OK' : '⚠️  Verificar conteos'}`);
+        } else {
+            console.log("  [!] Saltando tests de chat: no se pudo crear la reserva.");
+        }
 
         console.log("\n=== PRUEBAS COMPLETADAS ===");
 

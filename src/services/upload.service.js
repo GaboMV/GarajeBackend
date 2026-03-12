@@ -112,9 +112,43 @@ const deleteFilePublic = async (fileUrl) => {
     }
 }
 
+/**
+ * 5. Generar URL pre-firmada para SUBIDA de adjunto del Chat al bucket PRIVADO
+ * El cliente hace PUT con esta URL directo a R2 PRIVADO (sin URL pública permanente).
+ * Luego guarda la KEY (no la URL) y la usa para pedir acceso temporal.
+ */
+const getPresignedUploadUrl = async (fileName, contentType) => {
+    const command = new PutObjectCommand({
+        Bucket: BUCKET_PRIVATE,  // ← PRIVADO, igual que el KYC
+        Key: fileName,
+        ContentType: contentType,
+    });
+
+    // La URL de subida expira en 5 minutos
+    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+
+    // Solo retornamos la KEY del objeto, no una URL pública permanente
+    // Para leer la imagen después se genera una Presigned GET URL con getPresignedChatUrl
+    return { uploadUrl, key: fileName };
+};
+
+/**
+ * 6. Generar URL de LECTURA temporal para un adjunto privado del Chat (5 minutos)
+ * Idéntico al flujo de KYC. Solo el dueño/vendedor de la reserva puede pedirla.
+ */
+const getPresignedChatUrl = async (key) => {
+    const command = new GetObjectCommand({
+        Bucket: BUCKET_PRIVATE,
+        Key: key,
+    });
+    return getSignedUrl(s3Client, command, { expiresIn: 300 });
+};
+
 module.exports = {
     uploadFilePublic,
     uploadFilePrivate,
     getDynamicPresignedUrl,
-    deleteFilePublic
+    deleteFilePublic,
+    getPresignedUploadUrl,
+    getPresignedChatUrl
 };
