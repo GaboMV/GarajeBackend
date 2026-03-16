@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { register, login, approveUser, uploadKyc, getUserKyc } = require('../controllers/user.controller');
+const { register, login, approveUser, uploadKyc, getUserKyc, googleSignIn } = require('../controllers/user.controller');
 const { requireAuth, requireAdmin } = require('../middlewares/auth.middleware');
 const upload = require('../middlewares/upload.middleware');
 
@@ -63,6 +63,62 @@ router.post('/register', register);
  *         description: Unauthorized
  */
 router.post('/login', login);
+
+/**
+ * @swagger
+ * /api/users/auth/google:
+ *   post:
+ *     summary: Sign in / Sign up with Google (Firebase)
+ *     description: |
+ *       El cliente autentica al usuario con Google usando el SDK de Firebase.
+ *       Luego envía el `idToken` que devuelve Firebase a este endpoint.
+ *       El backend lo verifica, busca o crea el usuario local, y retorna un JWT propio.
+ *
+ *       **Notas importantes:**
+ *       - Este endpoint reemplaza el flujo "Continuar con Google" del frontend.
+ *       - No existe ni se necesita pantalla de OTP. El JWT se retorna directamente.
+ *       - El campo `modo_actual` en la respuesta indica si el usuario ya eligió su rol
+ *         o debe navegar a la pantalla ModeSelection.
+ *       - Requiere `src/config/firebase.admin.js` inicializado (ver instrucciones).
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - idToken
+ *             properties:
+ *               idToken:
+ *                 type: string
+ *                 description: Firebase ID Token obtenido tras autenticar con Google en el cliente
+ *     responses:
+ *       200:
+ *         description: JWT propio retornado. Navegar a ModeSelection si modo_actual es null.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: string }
+ *                     correo: { type: string }
+ *                     nombre_completo: { type: string }
+ *                     esta_verificado: { type: boolean }
+ *                     modo_actual: { type: string, nullable: true }
+ *       400:
+ *         description: idToken faltante o inválido
+ *       401:
+ *         description: Token de Google expirado
+ *       501:
+ *         description: Firebase Admin aún no configurado en el servidor
+ */
+router.post('/auth/google', googleSignIn);
 
 // Protected routes (require token)
 /**

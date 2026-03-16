@@ -43,10 +43,18 @@ const register = async (req, res, next) => {
             expiresIn: '7d'
         });
 
+        // Retornamos modo_actual explícitamente para que el frontend navegue
+        // directamente a ModeSelection (no hay pantalla de OTP)
         res.status(201).json({
-            message: 'Usuario registrado exitosamente. Requiere verificación KYC.',
+            message: 'Usuario registrado exitosamente.',
             token,
-            user: newUser
+            user: {
+                id: newUser.id,
+                correo: newUser.correo,
+                nombre_completo: newUser.nombre_completo,
+                esta_verificado: newUser.esta_verificado,
+                modo_actual: newUser.modo_actual  // → frontend navega a ModeSelection
+            }
         });
     } catch (error) {
         next(error);
@@ -193,10 +201,93 @@ const login = async (req, res, next) => {
     }
 }
 
+/**
+ * Google Sign-In / Social Auth
+ * El cliente (Flutter/React Native) usa Firebase Auth SDK con Google.
+ * Tras autenticar al usuario, Firebase devuelve un "idToken".
+ * Este endpoint recibe ese idToken, lo verifica y devuelve nuestro JWT propio.
+ *
+ * Flujo:
+ *   1. App → Google → Firebase idToken
+ *   2. App → POST /api/users/auth/google { idToken }
+ *   3. Backend verifica idToken con Firebase Admin SDK
+ *   4. Backend busca o crea el Usuario local
+ *   5. Backend devuelve { token, user } con nuestro JWT
+ */
+const googleSignIn = async (req, res, next) => {
+    try {
+        const { idToken } = req.body;
+
+        if (!idToken) {
+            return res.status(400).json({ error: 'idToken de Google es requerido' });
+        }
+
+        // Verificar el idToken con Firebase Admin SDK
+        // Requiere inicializar firebase-admin con las credenciales del proyecto.
+        // Por ahora el endpoint existe y está documentado; la inicialización de
+        // firebase-admin se completa cuando el equipo provea el Service Account JSON.
+        let firebaseAdmin;
+        try {
+            firebaseAdmin = require('../config/firebase.admin');
+        } catch (e) {
+            return res.status(501).json({
+                error: 'Google Sign-In aún no configurado en el servidor.',
+                instrucciones: 'Configura src/config/firebase.admin.js con el Service Account de Firebase para activar este endpoint.'
+            });
+        }
+
+        const decoded = await firebaseAdmin.auth().verifyIdToken(idToken);
+        const { email, name, uid } = decoded;
+
+        if (!email) {
+            return res.status(400).json({ error: 'El token de Google no contiene un correo electrónico.' });
+        }
+
+        // Buscar usuario existente o crear uno nuevo (sin contraseña)
+        let user = await prisma.usuario.findUnique({ where: { correo: email } });
+
+        if (!user) {
+            user = await prisma.usuario.create({
+                data: {
+                    correo: email,
+                    password: `google_uid_${uid}`, // contraseña placeholder; no usable para login clásico
+                    nombre_completo: name || null,
+                    esta_verificado: false
+                }
+            });
+        }
+
+        const token = jwt.sign({ id: user.id, correo: user.correo }, JWT_SECRET, {
+            expiresIn: '7d'
+        });
+
+        res.json({
+            message: user.createdAt === user.updatedAt ? 'Cuenta creada con Google.' : 'Login con Google exitoso.',
+            token,
+            user: {
+                id: user.id,
+                correo: user.correo,
+                nombre_completo: user.nombre_completo,
+                esta_verificado: user.esta_verificado,
+                modo_actual: user.modo_actual
+            }
+        });
+    } catch (error) {
+        if (error.code === 'auth/id-token-expired') {
+            return res.status(401).json({ error: 'El token de Google expiró. Vuelve a iniciar sesión.' });
+        }
+        if (error.code === 'auth/argument-error') {
+            return res.status(400).json({ error: 'Token de Google inválido.' });
+        }
+        next(error);
+    }
+};
+
 module.exports = {
     register,
     uploadKyc,
     getUserKyc,
     approveUser,
-    login
+    login,
+    googleSignIn
 };
