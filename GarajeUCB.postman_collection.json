@@ -1,0 +1,272 @@
+{
+	"info": {
+		"_postman_id": "7f8e9d0a-1b2c-4d5e-8f0a-1b2c3d4e5f6g",
+		"name": "GarajeUCB API Collection",
+		"description": "Colección completa para pruebas de integración del backend de GarajeUCB. Incluye flujos de Usuario, Garajes, Reservas, Finanzas y Chat.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Usuarios",
+			"item": [
+				{
+					"name": "Registrar Usuario",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"correo\": \"test_user@ejemplo.com\",\n  \"password\": \"password123\",\n  \"nombre_completo\": \"Juan Pérez\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"register"
+							]
+						}
+					}
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.token) {",
+									"    pm.collectionVariables.set(\"userToken\", jsonData.token);",
+									"    pm.collectionVariables.set(\"userId\", jsonData.user.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"correo\": \"test_user@ejemplo.com\",\n  \"password\": \"password123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"login"
+							]
+						}
+					}
+				},
+				{
+					"name": "Subir KYC",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{userToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "dni_foto",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "selfie",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/kyc",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"kyc"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Garajes",
+			"item": [
+				{
+					"name": "Crear Garaje",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.garaje) {",
+									"    pm.collectionVariables.set(\"garajeId\", jsonData.garaje.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{userToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Garaje Central\",\n  \"direccion\": \"Av. 6 de Agosto\",\n  \"lat\": -16.500,\n  \"lng\": -68.150,\n  \"precio_hora\": 12.5,\n  \"precio_dia\": 80.0,\n  \"capacidad\": 10\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/garages",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"garages"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Reservas",
+			"item": [
+				{
+					"name": "Crear Reserva",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.reserva) {",
+									"    pm.collectionVariables.set(\"reservaId\", jsonData.reserva.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{userToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"id_garaje\": \"{{garajeId}}\",\n  \"tipo_cobro\": \"POR_HORA\",\n  \"mensaje_inicial\": \"Hola, reservo para mañana\",\n  \"fechas\": [\n    {\n      \"fecha\": \"2026-03-25\",\n      \"hora_inicio\": \"10:00\",\n      \"hora_fin\": \"14:00\"\n    }\n  ],\n  \"acepto_terminos_responsabilidad\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/reservations",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"reservations"
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000/api",
+			"type": "string"
+		},
+		{
+			"key": "userToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "adminToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "garajeId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "reservaId",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

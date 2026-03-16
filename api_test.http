@@ -1,0 +1,231 @@
+### GarajeUCB API — Pruebas de Endpoints
+# Esta suite de pruebas es compatible con la extensión REST Client de VS Code
+
+@baseUrl = http://localhost:3000/api
+@authToken = {{login.response.body.token}}
+@adminToken = {{adminLogin.response.body.token}}
+
+# ==========================================
+# 1. USUARIOS
+# ==========================================
+
+### Registrar nuevo usuario
+# @name register
+POST {{baseUrl}}/users/register
+Content-Type: application/json
+
+{
+  "correo": "vendedor_test@ejemplo.com",
+  "password": "password123",
+  "nombre_completo": "Juan Pérez Test"
+}
+
+### Iniciar sesión (Vendedor/Dueño)
+# @name login
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "correo": "vendedor_test@ejemplo.com",
+  "password": "password123"
+}
+
+### Iniciar sesión (Admin)
+# @name adminLogin
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "correo": "admin@ejemplo.com",
+  "password": "adminPassword123"
+}
+
+### Login con Google (Firebase)
+POST {{baseUrl}}/users/auth/google
+Content-Type: application/json
+
+{
+  "idToken": "TOKEN_DE_FIREBASE_AQUI"
+}
+
+### Subir documentos KYC (DNI + Selfie)
+POST {{baseUrl}}/users/kyc
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="dni_foto"; filename="dni.jpg"
+Content-Type: image/jpeg
+
+< ./dummy.jpg
+--boundary
+Content-Disposition: form-data; name="selfie"; filename="selfie.jpg"
+Content-Type: image/jpeg
+
+< ./dummy.jpg
+--boundary--
+
+### Ver documentos KYC (Solo Admin)
+GET {{baseUrl}}/users/kyc/{{login.response.body.user.id}}
+Authorization: Bearer {{adminToken}}
+
+### Aprobar usuario (Solo Admin)
+POST {{baseUrl}}/users/approve/{{login.response.body.user.id}}
+Authorization: Bearer {{adminToken}}
+
+# ==========================================
+# 2. GARAJES
+# ==========================================
+
+### Crear un garaje
+# @name createGarage
+POST {{baseUrl}}/garages
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "nombre": "Garaje El Centro",
+  "direccion": "Av. Principal 123",
+  "lat": -16.5000,
+  "lng": -68.1500,
+  "precio_hora": 10.0,
+  "precio_dia": 70.0,
+  "capacidad": 5
+}
+
+### Agregar horario semanal
+POST {{baseUrl}}/garages/{{createGarage.response.body.garaje.id}}/horarios
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "dia_semana": 1,
+  "hora_inicio": "08:00",
+  "hora_fin": "20:00",
+  "abierto": true
+}
+
+### Subir imagen de garaje
+POST {{baseUrl}}/garages/{{createGarage.response.body.garaje.id}}/imagenes
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="imagen"; filename="garaje.jpg"
+Content-Type: image/jpeg
+
+< ./dummy.jpg
+--boundary--
+
+# ==========================================
+# 3. BÚSQUEDA
+# ==========================================
+
+### Buscar garajes disponibles
+GET {{baseUrl}}/search?fecha=2026-03-20&hora_inicio=09:00&hora_fin=13:00
+Authorization: Bearer {{authToken}}
+
+# ==========================================
+# 4. RESERVAS
+# ==========================================
+
+### Crear una reserva
+# @name createReservation
+POST {{baseUrl}}/reservations
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "id_garaje": "{{createGarage.response.body.garaje.id}}",
+  "tipo_cobro": "POR_HORA",
+  "mensaje_inicial": "Hola, alquilo para lunes",
+  "fechas": [
+    {
+      "fecha": "2026-03-20",
+      "hora_inicio": "09:00",
+      "hora_fin": "13:00"
+    }
+  ],
+  "categorias": [1, 2],
+  "acepto_terminos_responsabilidad": true
+}
+
+### Pagar reserva
+POST {{baseUrl}}/reservations/{{createReservation.response.body.reserva.id}}/pagar
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "metodo": "QR"
+}
+
+# ==========================================
+# 5. OPERACIONES (Check-in / Check-out)
+# ==========================================
+
+### Registrar Check-in
+POST {{baseUrl}}/operations/{{createReservation.response.body.reserva.id}}/check-in
+Authorization: Bearer {{authToken}}
+
+### Registrar Check-out (Libera fondos)
+POST {{baseUrl}}/operations/{{createReservation.response.body.reserva.id}}/check-out
+Authorization: Bearer {{authToken}}
+
+# ==========================================
+# 6. FINANZAS
+# ==========================================
+
+### Consultar saldo de billetera
+GET {{baseUrl}}/finances/billetera
+Authorization: Bearer {{authToken}}
+
+### Solicitar retiro
+POST {{baseUrl}}/finances/billetera/retiros
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "monto": 50.0,
+  "cuenta_bancaria": "BNB-12345678"
+}
+
+# ==========================================
+# 7. SOPORTE
+# ==========================================
+
+### Reportar disputa
+POST {{baseUrl}}/support/reservas/{{createReservation.response.body.reserva.id}}/disputa
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "tipo_problema": "LIMPIEZA",
+  "descripcion": "El espacio estaba sucio al llegar."
+}
+
+### Calificar experiencia
+POST {{baseUrl}}/support/reservas/{{createReservation.response.body.reserva.id}}/calificar
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "puntuacion": 5,
+  "comentario": "Excelente servicio."
+}
+
+# ==========================================
+# 8. CHAT
+# ==========================================
+
+### Obtener historial de mensajes
+GET {{baseUrl}}/chat/{{createReservation.response.body.reserva.id}}/mensajes
+Authorization: Bearer {{authToken}}
+
+### Generar Presigned URL para adjunto de chat
+POST {{baseUrl}}/chat/presigned-url
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "contentType": "image/jpeg"
+}
