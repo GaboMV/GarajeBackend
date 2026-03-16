@@ -5,13 +5,13 @@ const { register, login, approveUser, uploadKyc, getUserKyc, googleSignIn } = re
 const { requireAuth, requireAdmin } = require('../middlewares/auth.middleware');
 const upload = require('../middlewares/upload.middleware');
 
-// Public routes
+// Rutas públicas
 /**
  * @swagger
  * /api/users/register:
  *   post:
- *     summary: Register a new user
- *     tags: [Users]
+ *     summary: Registrar un nuevo usuario
+ *     tags: [Usuarios]
  *     requestBody:
  *       required: true
  *       content:
@@ -24,15 +24,18 @@ const upload = require('../middlewares/upload.middleware');
  *             properties:
  *               correo:
  *                 type: string
+ *                 description: Correo electrónico del usuario
  *               password:
  *                 type: string
+ *                 description: Contraseña del usuario
  *               nombre_completo:
  *                 type: string
+ *                 description: Nombre completo del usuario
  *     responses:
  *       201:
- *         description: User registered successfully
+ *         description: Usuario registrado exitosamente
  *       400:
- *         description: Bad request
+ *         description: Solicitud inválida
  */
 router.post('/register', register);
 
@@ -40,8 +43,8 @@ router.post('/register', register);
  * @swagger
  * /api/users/login:
  *   post:
- *     summary: Login user
- *     tags: [Users]
+ *     summary: Iniciar sesión con correo y contraseña
+ *     tags: [Usuarios]
  *     requestBody:
  *       required: true
  *       content:
@@ -54,13 +57,15 @@ router.post('/register', register);
  *             properties:
  *               correo:
  *                 type: string
+ *                 description: Correo electrónico del usuario
  *               password:
  *                 type: string
+ *                 description: Contraseña del usuario
  *     responses:
  *       200:
- *         description: Login successful
+ *         description: Sesión iniciada correctamente, retorna JWT
  *       401:
- *         description: Unauthorized
+ *         description: No autorizado, credenciales inválidas
  */
 router.post('/login', login);
 
@@ -68,7 +73,7 @@ router.post('/login', login);
  * @swagger
  * /api/users/auth/google:
  *   post:
- *     summary: Sign in / Sign up with Google (Firebase)
+ *     summary: Iniciar sesión / Registrarse con Google (Firebase)
  *     description: |
  *       El cliente autentica al usuario con Google usando el SDK de Firebase.
  *       Luego envía el `idToken` que devuelve Firebase a este endpoint.
@@ -78,9 +83,9 @@ router.post('/login', login);
  *       - Este endpoint reemplaza el flujo "Continuar con Google" del frontend.
  *       - No existe ni se necesita pantalla de OTP. El JWT se retorna directamente.
  *       - El campo `modo_actual` en la respuesta indica si el usuario ya eligió su rol
- *         o debe navegar a la pantalla ModeSelection.
+ *         o debe navegar a la pantalla de selección de modo.
  *       - Requiere `src/config/firebase.admin.js` inicializado (ver instrucciones).
- *     tags: [Users]
+ *     tags: [Usuarios]
  *     requestBody:
  *       required: true
  *       content:
@@ -92,10 +97,10 @@ router.post('/login', login);
  *             properties:
  *               idToken:
  *                 type: string
- *                 description: Firebase ID Token obtenido tras autenticar con Google en el cliente
+ *                 description: Token ID de Firebase obtenido tras autenticar con Google en el cliente
  *     responses:
  *       200:
- *         description: JWT propio retornado. Navegar a ModeSelection si modo_actual es null.
+ *         description: JWT propio retornado. Navegar a selección de modo si `modo_actual` es null.
  *         content:
  *           application/json:
  *             schema:
@@ -120,13 +125,13 @@ router.post('/login', login);
  */
 router.post('/auth/google', googleSignIn);
 
-// Protected routes (require token)
+// Rutas protegidas (requieren token JWT)
 /**
  * @swagger
  * /api/users/kyc:
  *   post:
- *     summary: Upload KYC documents
- *     tags: [Users]
+ *     summary: Subir documentos KYC (DNI + selfie)
+ *     tags: [Usuarios]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -139,22 +144,24 @@ router.post('/auth/google', googleSignIn);
  *               dni_foto:
  *                 type: string
  *                 format: binary
+ *                 description: Foto del DNI del usuario
  *               selfie:
  *                 type: string
  *                 format: binary
+ *                 description: Selfie del usuario
  *     responses:
  *       200:
- *         description: KYC documents uploaded successfully
+ *         description: Documentos KYC subidos exitosamente
  */
 router.post('/kyc', requireAuth, upload.fields([{ name: 'dni_foto', maxCount: 1 }, { name: 'selfie', maxCount: 1 }]), uploadKyc);
 
-// Admin routes (require admin privileges)
+// Rutas de administrador (requieren privilegios de admin)
 /**
  * @swagger
  * /api/users/kyc/{idUsuario}:
  *   get:
- *     summary: View User KYC Documents (Admin only - generates 5min URL)
- *     tags: [Users]
+ *     summary: Ver documentos KYC de un usuario (solo admin — genera URL con vigencia de 5 min)
+ *     tags: [Usuarios]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -163,19 +170,21 @@ router.post('/kyc', requireAuth, upload.fields([{ name: 'dni_foto', maxCount: 1 
  *         required: true
  *         schema:
  *           type: string
+ *         description: ID del usuario a consultar
  *     responses:
  *       200:
- *         description: Ephemeral URLs generated successfully
+ *         description: URLs temporales generadas exitosamente
  *       404:
- *         description: User not found
+ *         description: Usuario no encontrado
  */
 router.get('/kyc/:idUsuario', requireAdmin, getUserKyc);
+
 /**
  * @swagger
  * /api/users/approve/{idUsuario}:
  *   post:
- *     summary: Approve a user (Admin only)
- *     tags: [Users]
+ *     summary: Aprobar un usuario verificado (solo admin)
+ *     tags: [Usuarios]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -184,9 +193,10 @@ router.get('/kyc/:idUsuario', requireAdmin, getUserKyc);
  *         required: true
  *         schema:
  *           type: string
+ *         description: ID del usuario a aprobar
  *     responses:
  *       200:
- *         description: User approved successfully
+ *         description: Usuario aprobado exitosamente
  */
 router.post('/approve/:idUsuario', requireAdmin, approveUser);
 

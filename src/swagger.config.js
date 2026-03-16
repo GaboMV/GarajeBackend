@@ -4,17 +4,25 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'GarajeBackend API Documentation',
+      title: 'GarajeUCB — Documentación de API',
       version: '1.0.0',
-      description: 'API documentation for the GarajeBackend freelance project.',
+      description:
+        'Documentación de la API REST del proyecto GarajeUCB. ' +
+        'Plataforma de alquiler de garajes/espacios comerciales entre particulares. ' +
+        'Incluye autenticación JWT, verificación KYC, gestión de reservas, pagos, ' +
+        'chat en tiempo real (Socket.io) y panel administrativo.',
       contact: {
-        name: 'Developer',
+        name: 'Equipo GarajeUCB',
       },
     },
     servers: [
       {
         url: 'http://localhost:3000',
-        description: 'Local server',
+        description: 'Servidor local (desarrollo)',
+      },
+      {
+        url: 'https://tu-backend.onrender.com',
+        description: 'Servidor de producción',
       },
     ],
     components: {

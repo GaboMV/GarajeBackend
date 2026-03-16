@@ -1,24 +1,27 @@
-# Garajes Backend API
+# 🅿️ GarajeUCB — Backend API
 
 ## Descripción
-Sistema backend para una plataforma de alquiler de garajes/espacios comerciales entre particulares. Permite a los dueños publicar sus garajes disponibles y a los vendedores ambulantes reservar espacios para vender sus productos, incluyendo gestión de pagos, chat en tiempo real, verificación KYC y sistema de soporte con disputas.
 
-## Objetivo general
-- Proveer una API REST robusta y segura que gestione el ciclo completo de alquiler de garajes: desde el registro y verificación de usuarios, hasta la reserva, pago, operación (check-in/check-out), finanzas y soporte.
+Sistema backend para una plataforma de alquiler de garajes y espacios comerciales entre particulares. Permite a los dueños publicar sus garajes disponibles y a los vendedores ambulantes reservar espacios para comercializar sus productos. Incluye gestión de pagos, chat en tiempo real, verificación de identidad (KYC) y un sistema de soporte con disputas y calificaciones.
 
-## Objetivos específicos (medibles)
-- Implementar una API REST con +25 endpoints funcionales organizados en 8 módulos.
-- Persistir datos en PostgreSQL usando Prisma ORM con 20+ modelos relacionales.
-- Implementar autenticación JWT con verificación KYC obligatoria.
+## Objetivo General
+
+Proveer una API REST robusta y segura que gestione el ciclo completo de alquiler de garajes: desde el registro y verificación de usuarios hasta la reserva, pago, operación (check-in/check-out), finanzas y soporte.
+
+## Objetivos Específicos
+
+- Implementar una API REST con más de 25 endpoints funcionales organizados en 8 módulos.
+- Persistir datos en PostgreSQL utilizando Prisma ORM con más de 20 modelos relacionales.
+- Implementar autenticación JWT con verificación KYC obligatoria y soporte para inicio de sesión con Google (Firebase).
 - Integrar chat en tiempo real con Socket.io y almacenamiento de adjuntos en Cloudflare R2.
 - Implementar sistema financiero con billetera virtual, retenciones y retiros.
-- Documentar la API automáticamente con Swagger/OpenAPI.
+- Documentar la API automáticamente con Swagger/OpenAPI en `/api-docs`.
 
-## Alcance (qué incluye / qué NO incluye)
+## Alcance
 
 **Incluye:**
-- CRUD de usuarios con registro, login y verificación KYC
-- Gestión completa de garajes (crear, horarios, servicios, imágenes, fechas bloqueadas)
+- CRUD de usuarios con registro, login, autenticación con Google y verificación KYC
+- Gestión completa de garajes (crear, horarios semanales, servicios adicionales, imágenes, fechas bloqueadas)
 - Búsqueda de garajes disponibles por fecha y horario
 - Sistema de reservas con fechas, categorías y servicios extra
 - Procesamiento de pagos con comprobantes (QR o tarjeta)
@@ -27,7 +30,7 @@ Sistema backend para una plataforma de alquiler de garajes/espacios comerciales 
 - Chat en tiempo real (Socket.io) con historial persistido y adjuntos de imagen
 - Sistema de soporte: disputas, tickets y calificaciones
 - Panel administrativo (aprobar usuarios, resolver tickets, aprobar retiros)
-- Documentación Swagger en `/api-docs`
+- Documentación Swagger interactiva en `/api-docs`
 
 **No incluye (por ahora):**
 - Frontend / interfaz de usuario
@@ -36,22 +39,26 @@ Sistema backend para una plataforma de alquiler de garajes/espacios comerciales 
 - Roles avanzados más allá de usuario/admin
 - Deploy automatizado (CI/CD)
 
-## Stack tecnológico
-- **Backend:** Node.js + Express 5
-- **Base de datos:** PostgreSQL
-- **ORM:** Prisma 5
-- **Autenticación:** JSON Web Tokens (jsonwebtoken) + bcryptjs
-- **Tiempo Real:** Socket.io
-- **Almacenamiento de archivos:** Cloudflare R2 (AWS S3 SDK compatible)
-- **Documentación:** Swagger (swagger-jsdoc + swagger-ui-express)
-- **Seguridad:** Helmet + CORS + express-rate-limit
-- **Upload de archivos:** Multer
-- **Testing:** Postman
-- **Control de versiones:** Git + GitHub
+## Stack Tecnológico
 
-## Arquitectura (resumen simple)
+| Tecnología | Uso |
+|---|---|
+| Node.js + Express 5 | Servidor HTTP y API REST |
+| PostgreSQL | Base de datos relacional |
+| Prisma 5 | ORM y migraciones |
+| JWT (jsonwebtoken) + bcryptjs | Autenticación y hashing de contraseñas |
+| Firebase Admin SDK | Verificación de tokens de Google |
+| Socket.io | Chat en tiempo real |
+| Cloudflare R2 (AWS S3 SDK) | Almacenamiento de imágenes y archivos |
+| Swagger (swagger-jsdoc + swagger-ui-express) | Documentación automática de la API |
+| Helmet + CORS + express-rate-limit | Seguridad y control de acceso |
+| Multer | Manejo de archivos multipart/form-data |
+| Git + GitHub | Control de versiones |
+
+## Arquitectura
+
 ```
-Cliente (Frontend/Mobile)
+Cliente (Frontend / Mobile)
         │
         ▼
    API REST (Express)  ◄──►  Socket.io (Chat en tiempo real)
@@ -64,7 +71,7 @@ Cliente (Frontend/Mobile)
 ```
 
 **Flujo principal del sistema:**
-1. El usuario se registra y sube documentos KYC (foto DNI + selfie).
+1. El usuario se registra (con correo/contraseña o con Google) y sube documentos KYC (foto DNI + selfie).
 2. Un administrador aprueba la verificación KYC del usuario.
 3. El usuario verificado puede crear garajes (modo arrendatario) o buscar garajes disponibles (modo vendedor).
 4. El vendedor crea una reserva, selecciona fechas/horarios y paga.
@@ -73,12 +80,12 @@ Cliente (Frontend/Mobile)
 7. El dueño puede solicitar retiros a su cuenta bancaria.
 8. Ambas partes pueden chatear en tiempo real y calificarse mutuamente.
 
-## Entidades principales (modelos de datos)
+## Modelos de Datos
 
 | Modelo | Campos clave |
 |---|---|
 | `Usuario` | id, correo, password, nombre_completo, esta_verificado, es_admin, modo_actual |
-| `Garaje` | id, id_dueno, nombre, direccion, lat/lng, precio_hora, precio_dia, capacidad, amenidades |
+| `Garaje` | id, id_dueno, nombre, direccion, lat/lng, precio_hora, precio_dia, capacidad |
 | `HorarioSemanal` | id, id_garaje, dia_semana, abierto, hora_inicio, hora_fin |
 | `Reserva` | id, id_garaje, id_vendedor, estado, tipo_cobro, precio_total, comision_app |
 | `FechaReserva` | id, id_reserva, fecha, hora_inicio, hora_fin, estado, check-in/check-out real |
@@ -88,63 +95,64 @@ Cliente (Frontend/Mobile)
 | `TicketSoporte` | id, id_reserva, id_reportador, tipo_problema, estado, resolucion_admin |
 | `Calificacion` | id, id_reserva, id_autor, id_objetivo, puntuacion, comentario |
 
-## Endpoints core (priorizados)
+## Endpoints
 
 ### 1. Usuarios (`/api/users`)
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `POST` | `/api/users/register` | Registrar nuevo usuario |
-| `POST` | `/api/users/login` | Iniciar sesión (devuelve JWT) |
-| `POST` | `/api/users/kyc` | Subir documentos KYC (DNI + selfie) |
-| `GET` | `/api/users/kyc/:idUsuario` | Ver documentos KYC (solo admin) |
-| `POST` | `/api/users/approve/:idUsuario` | Aprobar usuario verificado (solo admin) |
+| Método | Endpoint | Auth | Descripción |
+|---|---|---|---|
+| `POST` | `/api/users/register` | No | Registrar nuevo usuario |
+| `POST` | `/api/users/login` | No | Iniciar sesión (devuelve JWT) |
+| `POST` | `/api/users/auth/google` | No | Iniciar sesión con Google (Firebase) |
+| `POST` | `/api/users/kyc` | JWT | Subir documentos KYC (DNI + selfie) |
+| `GET` | `/api/users/kyc/:idUsuario` | Admin | Ver documentos KYC de un usuario |
+| `POST` | `/api/users/approve/:idUsuario` | Admin | Aprobar usuario verificado |
 
 ### 2. Garajes (`/api/garages`)
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `POST` | `/api/garages` | Crear un garaje |
-| `POST` | `/api/garages/:idGaraje/horarios` | Agregar horario semanal |
-| `POST` | `/api/garages/:idGaraje/servicios` | Agregar servicio adicional |
-| `POST` | `/api/garages/:idGaraje/bloquear-fecha` | Bloquear fecha específica |
-| `POST` | `/api/garages/:idGaraje/imagenes` | Subir imagen del garaje |
+| Método | Endpoint | Auth | Descripción |
+|---|---|---|---|
+| `POST` | `/api/garages` | JWT + KYC | Crear un garaje |
+| `POST` | `/api/garages/:idGaraje/horarios` | JWT + KYC | Agregar horario semanal |
+| `POST` | `/api/garages/:idGaraje/servicios` | JWT + KYC | Agregar servicio adicional |
+| `POST` | `/api/garages/:idGaraje/bloquear-fecha` | JWT + KYC | Bloquear fecha específica |
+| `POST` | `/api/garages/:idGaraje/imagenes` | JWT + KYC | Subir imagen del garaje |
 
 ### 3. Búsqueda (`/api/search`)
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `GET` | `/api/search?fecha=YYYY-MM-DD&hora_inicio=HH:mm&hora_fin=HH:mm` | Buscar garajes disponibles |
+| Método | Endpoint | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/api/search?fecha=YYYY-MM-DD&hora_inicio=HH:mm&hora_fin=HH:mm` | JWT + KYC | Buscar garajes disponibles |
 
 ### 4. Reservas (`/api/reservations`)
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `POST` | `/api/reservations` | Crear reserva |
-| `POST` | `/api/reservations/:idReserva/pagar` | Pagar reserva |
+| Método | Endpoint | Auth | Descripción |
+|---|---|---|---|
+| `POST` | `/api/reservations` | JWT + KYC | Crear reserva |
+| `POST` | `/api/reservations/:idReserva/pagar` | JWT + KYC | Pagar reserva |
 
 ### 5. Operaciones (`/api/operations`)
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `POST` | `/api/operations/:idReserva/check-in` | Registrar check-in |
-| `POST` | `/api/operations/:idReserva/check-out` | Registrar check-out y liberar fondos |
+| Método | Endpoint | Auth | Descripción |
+|---|---|---|---|
+| `POST` | `/api/operations/:idReserva/check-in` | JWT + KYC | Registrar check-in |
+| `POST` | `/api/operations/:idReserva/check-out` | JWT + KYC | Registrar check-out y liberar fondos |
 
 ### 6. Finanzas (`/api/finances`)
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `GET` | `/api/finances/billetera` | Consultar saldo de billetera |
-| `POST` | `/api/finances/billetera/retiros` | Solicitar retiro a cuenta bancaria |
-| `POST` | `/api/finances/billetera/retiros/:idSolicitud/aprobar` | Aprobar retiro (solo admin) |
+| Método | Endpoint | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/api/finances/billetera` | JWT + KYC | Consultar saldo de billetera |
+| `POST` | `/api/finances/billetera/retiros` | JWT + KYC | Solicitar retiro a cuenta bancaria |
+| `POST` | `/api/finances/billetera/retiros/:idSolicitud/aprobar` | Admin | Aprobar retiro |
 
 ### 7. Soporte (`/api/support`)
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `POST` | `/api/support/reservas/:idReserva/disputa` | Reportar problema/disputa |
-| `POST` | `/api/support/tickets/:idTicket/resolver` | Resolver ticket (solo admin) |
-| `POST` | `/api/support/reservas/:idReserva/calificar` | Calificar experiencia |
+| Método | Endpoint | Auth | Descripción |
+|---|---|---|---|
+| `POST` | `/api/support/reservas/:idReserva/disputa` | JWT + KYC | Reportar problema/disputa |
+| `POST` | `/api/support/tickets/:idTicket/resolver` | Admin | Resolver ticket de soporte |
+| `POST` | `/api/support/reservas/:idReserva/calificar` | JWT + KYC | Calificar experiencia |
 
 ### 8. Chat (`/api/chat` + Socket.io)
-| Método | Endpoint | Descripción |
-|---|---|---|
-| `GET` | `/api/chat/:idReserva/mensajes` | Obtener historial de mensajes |
-| `POST` | `/api/chat/presigned-url` | Generar URL firmada para subir imagen |
-| `GET` | `/api/chat/adjunto/:key` | Obtener URL temporal de lectura de adjunto |
+| Método | Endpoint | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/api/chat/:idReserva/mensajes` | JWT | Obtener historial de mensajes |
+| `POST` | `/api/chat/presigned-url` | JWT | Generar URL firmada para subir imagen |
+| `GET` | `/api/chat/adjunto/:key` | JWT | Obtener URL temporal de lectura de adjunto |
 
 **Eventos Socket.io:**
 | Evento | Dirección | Descripción |
@@ -154,12 +162,12 @@ Cliente (Frontend/Mobile)
 | `receive_message` | Servidor → Cliente | Recibir mensaje en tiempo real |
 | `leave_room` | Cliente → Servidor | Salir del room |
 
-## Cómo ejecutar el proyecto (local)
+## Cómo Ejecutar el Proyecto
 
-1. **Clonar repositorio**
+1. **Clonar el repositorio**
    ```bash
-   git clone <URL>
-   cd backend_garajes
+   git clone https://github.com/GaboMV/AppGarajeUCB-.git
+   cd AppGarajeUCB-
    ```
 
 2. **Instalar dependencias**
@@ -194,13 +202,17 @@ Cliente (Frontend/Mobile)
    GET http://localhost:3000/health
    ```
 
-## Variables de entorno (ejemplo)
+## Variables de Entorno
+
 ```env
 # Base de datos PostgreSQL
 DATABASE_URL=postgresql://postgres:tu_password@localhost:5432/garajes_db?schema=public
 PORT=3000
 
-# Cloudflare R2 (Storage de archivos)
+# JWT
+JWT_SECRET=tu_clave_secreta_jwt
+
+# Cloudflare R2 (almacenamiento de archivos)
 R2_ACCOUNT_ID=tu_account_id_cloudflare
 R2_ACCESS_KEY_ID=tu_access_key_id
 R2_SECRET_ACCESS_KEY=tu_secret_access_key
@@ -216,7 +228,8 @@ R2_BUCKET_PRIVATE=garajes-kyc
 FRONTEND_URL=https://tu-dominio-frontend.com
 ```
 
-## Estructura del proyecto
+## Estructura del Proyecto
+
 ```
 backend_garajes/
   src/
@@ -252,7 +265,7 @@ backend_garajes/
     db/
       prisma.js                # Instancia del cliente Prisma
     config/
-      supabase.js              # Configuración de Supabase (referencia)
+      firebase.admin.js        # Configuración de Firebase Admin SDK
   prisma/
     schema.prisma              # Esquema de base de datos (20+ modelos)
     migrations/                # Migraciones de Prisma
@@ -261,46 +274,40 @@ backend_garajes/
   README.md
 ```
 
-**Explicación del flujo:** Routes recibe la petición HTTP, el controller decide qué hacer y aplica la lógica del negocio, el service maneja operaciones externas (ej: Cloudflare R2), y Prisma se encarga de guardar o leer los datos en PostgreSQL.
+> **Flujo de capas:** Routes recibe la petición HTTP → el Controller aplica la lógica de negocio → el Service interactúa con servicios externos (ej: Cloudflare R2) → Prisma persiste o consulta datos en PostgreSQL.
 
-## Ejemplos de Endpoints
+## Ejemplos de Uso
 
-### Endpoint 1 — Registrar usuario
+### Registrar un usuario
 ```http
 POST /api/users/register
 Content-Type: application/json
-```
-**Body (JSON):**
-```json
+
 {
   "correo": "vendedor@ejemplo.com",
   "password": "miPassword123",
   "nombre_completo": "Juan Pérez"
 }
 ```
-**Resultado:** Devuelve el usuario creado con su token JWT.
-**Explicación:** Crea un nuevo registro de usuario con password hasheado (bcrypt).
+**Respuesta:** Usuario creado con token JWT incluido.
 
 ---
 
-### Endpoint 2 — Buscar garajes disponibles
+### Buscar garajes disponibles
 ```http
 GET /api/search?fecha=2026-03-15&hora_inicio=10:00&hora_fin=14:00
 Authorization: Bearer <token>
 ```
-**Resultado:** Devuelve un arreglo con los garajes disponibles en esa fecha y horario.
-**Explicación:** Consulta la base de datos filtrando por disponibilidad, horarios semanales y fechas bloqueadas.
+**Respuesta:** Arreglo de garajes disponibles en esa fecha y horario.
 
 ---
 
-### Endpoint 3 — Crear una reserva
+### Crear una reserva
 ```http
 POST /api/reservations
 Authorization: Bearer <token>
 Content-Type: application/json
-```
-**Body (JSON):**
-```json
+
 {
   "id_garaje": "uuid-del-garaje",
   "tipo_cobro": "POR_HORA",
@@ -316,10 +323,12 @@ Content-Type: application/json
   "acepto_terminos_responsabilidad": true
 }
 ```
-**Resultado:** Devuelve la reserva creada con su precio calculado, comisión y desglose.
-**Explicación:** Crea la reserva, calcula el precio total y retiene los fondos en la billetera del dueño.
+**Respuesta:** Reserva creada con precio calculado, comisión y desglose.
 
-## Equipo y roles
-- Nombre 1: Backend
-- Nombre 2: Frontend
-- Nombre 3: DevOps / QA
+## Equipo y Roles
+
+| Nombre | Rol |
+|---|---|
+| Gabriel Mamani | Backend |
+| — | Frontend |
+| — | DevOps / QA |

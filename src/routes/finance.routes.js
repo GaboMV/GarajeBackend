@@ -8,43 +8,63 @@ const { requireAuth, requireVerifiedKYC, requireAdmin } = require('../middleware
 router.use(requireAuth);
 router.use(requireVerifiedKYC);
 
-// Consultar saldo de su propia billetera
 /**
  * @swagger
  * /api/finances/billetera:
  *   get:
- *     summary: Get balance of own wallet
- *     tags: [Finances]
+ *     summary: Consultar saldo de la billetera virtual propia
+ *     description: Retorna el saldo disponible y el saldo retenido (fondos pendientes de liberar) del usuario autenticado.
+ *     tags: [Finanzas]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Wallet balance
+ *         description: Información de la billetera del usuario
+ *         content:
+ *           application/json:
+ *             example:
+ *               saldo_disponible: 150.00
+ *               saldo_retenido: 50.00
  */
 router.get('/billetera', getBalance);
 
-// Reportar un retiro hacia cuenta bancaria
 /**
  * @swagger
  * /api/finances/billetera/retiros:
  *   post:
- *     summary: Request a withdrawal to bank account
- *     tags: [Finances]
+ *     summary: Solicitar retiro del saldo disponible a cuenta bancaria
+ *     tags: [Finanzas]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - monto
+ *               - cuenta_bancaria
+ *             properties:
+ *               monto:
+ *                 type: number
+ *                 description: Monto a retirar
+ *               cuenta_bancaria:
+ *                 type: string
+ *                 description: Número de cuenta bancaria destino
  *     responses:
  *       201:
- *         description: Withdrawal requested successfully
+ *         description: Solicitud de retiro creada exitosamente, pendiente de aprobación por el administrador
  */
 router.post('/billetera/retiros', requestWithdrawal);
 
-// (Admin) Aprobar el retiro y liquidar la deuda
 /**
  * @swagger
  * /api/finances/billetera/retiros/{idSolicitud}/aprobar:
  *   post:
- *     summary: Approve a withdrawal (Admin only)
- *     tags: [Finances]
+ *     summary: Aprobar una solicitud de retiro (solo admin)
+ *     description: El administrador aprueba el retiro y registra la liquidación. El saldo disponible se descuenta del usuario.
+ *     tags: [Finanzas]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -53,9 +73,11 @@ router.post('/billetera/retiros', requestWithdrawal);
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
+ *         description: ID de la solicitud de retiro
  *     responses:
  *       200:
- *         description: Withdrawal approved successfully
+ *         description: Retiro aprobado y liquidado exitosamente
  */
 router.post('/billetera/retiros/:idSolicitud/aprobar', requireAdmin, approveWithdrawal);
 

@@ -8,28 +8,70 @@ const { requireAuth, requireVerifiedKYC } = require('../middlewares/auth.middlew
 router.use(requireAuth);
 router.use(requireVerifiedKYC);
 
-// Flujo 4: Crear la reserva interactuando con Escrow y Comisiones
 /**
  * @swagger
  * /api/reservations:
  *   post:
- *     summary: Create a new reservation
- *     tags: [Reservations]
+ *     summary: Crear una nueva reserva
+ *     description: Crea la reserva, calcula el precio total según tipo de cobro y retiene fondos en la billetera del dueño.
+ *     tags: [Reservas]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - id_garaje
+ *               - tipo_cobro
+ *               - fechas
+ *               - acepto_terminos_responsabilidad
+ *             properties:
+ *               id_garaje:
+ *                 type: string
+ *                 format: uuid
+ *                 description: ID del garaje a reservar
+ *               tipo_cobro:
+ *                 type: string
+ *                 enum: [POR_HORA, POR_DIA]
+ *                 description: Modalidad de cobro
+ *               mensaje_inicial:
+ *                 type: string
+ *                 description: Mensaje opcional para el dueño del garaje
+ *               fechas:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     fecha:
+ *                       type: string
+ *                       format: date
+ *                     hora_inicio:
+ *                       type: string
+ *                     hora_fin:
+ *                       type: string
+ *               categorias:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: IDs de categorías de productos
+ *               acepto_terminos_responsabilidad:
+ *                 type: boolean
+ *                 description: Aceptación de los términos de responsabilidad
  *     responses:
  *       201:
- *         description: Reservation created successfully
+ *         description: Reserva creada exitosamente con precio calculado y desglose de comisión
  */
 router.post('/', createReservation);
 
-// Flujo 4: Pagar y enviar fondos a Cartera Retenida del Dueño
 /**
  * @swagger
  * /api/reservations/{idReserva}/pagar:
  *   post:
- *     summary: Pay for a reservation
- *     tags: [Reservations]
+ *     summary: Pagar una reserva y transferir fondos a la billetera retenida del dueño
+ *     tags: [Reservas]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -38,9 +80,22 @@ router.post('/', createReservation);
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
+ *         description: ID de la reserva a pagar
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               metodo:
+ *                 type: string
+ *                 enum: [QR, TARJETA]
+ *                 description: Método de pago utilizado
  *     responses:
  *       200:
- *         description: Reservation paid successfully
+ *         description: Reserva pagada exitosamente
  */
 router.post('/:idReserva/pagar', payReservation);
 

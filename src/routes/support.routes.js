@@ -7,13 +7,13 @@ const { requireAuth, requireVerifiedKYC, requireAdmin } = require('../middleware
 router.use(requireAuth);
 router.use(requireVerifiedKYC);
 
-// Flujo 6: Botón de Pánico
 /**
  * @swagger
  * /api/support/reservas/{idReserva}/disputa:
  *   post:
- *     summary: Report an issue/dispute for a reservation
- *     tags: [Support]
+ *     summary: Reportar un problema o disputa en una reserva
+ *     description: Crea un ticket de soporte asociado a la reserva. El administrador podrá revisarlo y resolverlo.
+ *     tags: [Soporte]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -22,9 +22,27 @@ router.use(requireVerifiedKYC);
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
+ *         description: ID de la reserva con el problema
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - tipo_problema
+ *               - descripcion
+ *             properties:
+ *               tipo_problema:
+ *                 type: string
+ *                 description: Tipo de problema reportado
+ *               descripcion:
+ *                 type: string
+ *                 description: Descripción detallada del problema
  *     responses:
  *       200:
- *         description: Issue reported successfully
+ *         description: Disputa reportada exitosamente. Se creó un ticket de soporte.
  */
 router.post('/reservas/:idReserva/disputa', reportIssue);
 
@@ -32,8 +50,9 @@ router.post('/reservas/:idReserva/disputa', reportIssue);
  * @swagger
  * /api/support/tickets/{idTicket}/resolver:
  *   post:
- *     summary: Resolve a support ticket (Admin only)
- *     tags: [Support]
+ *     summary: Resolver un ticket de soporte (solo admin)
+ *     description: El administrador revisa el ticket y registra la resolución. El ticket queda cerrado.
+ *     tags: [Soporte]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -42,9 +61,23 @@ router.post('/reservas/:idReserva/disputa', reportIssue);
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
+ *         description: ID del ticket a resolver
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - resolucion
+ *             properties:
+ *               resolucion:
+ *                 type: string
+ *                 description: Texto con la resolución del administrador
  *     responses:
  *       200:
- *         description: Ticket resolved successfully
+ *         description: Ticket resuelto exitosamente
  */
 router.post('/tickets/:idTicket/resolver', requireAdmin, resolveTicket);
 
@@ -52,8 +85,9 @@ router.post('/tickets/:idTicket/resolver', requireAdmin, resolveTicket);
  * @swagger
  * /api/support/reservas/{idReserva}/calificar:
  *   post:
- *     summary: Rate the experience for a reservation
- *     tags: [Support]
+ *     summary: Calificar la experiencia de una reserva
+ *     description: Permite al dueño o al vendedor calificar la experiencia una vez finalizada la reserva.
+ *     tags: [Soporte]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -62,9 +96,28 @@ router.post('/tickets/:idTicket/resolver', requireAdmin, resolveTicket);
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
+ *         description: ID de la reserva a calificar
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - puntuacion
+ *             properties:
+ *               puntuacion:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 description: Puntuación del 1 al 5
+ *               comentario:
+ *                 type: string
+ *                 description: Comentario opcional sobre la experiencia
  *     responses:
  *       200:
- *         description: Experience rated successfully
+ *         description: Calificación registrada exitosamente
  */
 router.post('/reservas/:idReserva/calificar', rateExperience);
 

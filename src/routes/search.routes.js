@@ -14,8 +14,8 @@ router.use(requireVerifiedKYC);
  * @swagger
  * /api/search:
  *   get:
- *     summary: Search for available garages
- *     tags: [Search]
+ *     summary: Buscar garajes disponibles por fecha y horario
+ *     tags: [Búsqueda]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -24,20 +24,20 @@ router.use(requireVerifiedKYC);
  *         schema:
  *           type: string
  *           format: date
- *         description: Date to search (YYYY-MM-DD)
+ *         description: Fecha de búsqueda (formato AAAA-MM-DD)
  *       - in: query
  *         name: hora_inicio
  *         schema:
  *           type: string
- *         description: Start time (HH:mm)
+ *         description: Hora de inicio (HH:mm)
  *       - in: query
  *         name: hora_fin
  *         schema:
  *           type: string
- *         description: End time (HH:mm)
+ *         description: Hora de fin (HH:mm)
  *     responses:
  *       200:
- *         description: List of available garages
+ *         description: Lista de garajes disponibles en el horario indicado
  */
 router.get('/', searchGarajes);
 

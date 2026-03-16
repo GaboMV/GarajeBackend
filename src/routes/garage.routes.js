@@ -16,28 +16,54 @@ const upload = require('../middlewares/upload.middleware');
 router.use(requireAuth);
 router.use(requireVerifiedKYC);
 
-// Crear un garaje
 /**
  * @swagger
  * /api/garages:
  *   post:
- *     summary: Create a new garage
- *     tags: [Garages]
+ *     summary: Crear un nuevo garaje
+ *     tags: [Garajes]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nombre:
+ *                 type: string
+ *                 description: Nombre del garaje
+ *               direccion:
+ *                 type: string
+ *                 description: Dirección del garaje
+ *               lat:
+ *                 type: number
+ *                 description: Latitud
+ *               lng:
+ *                 type: number
+ *                 description: Longitud
+ *               precio_hora:
+ *                 type: number
+ *                 description: Precio por hora
+ *               precio_dia:
+ *                 type: number
+ *                 description: Precio por día
+ *               capacidad:
+ *                 type: integer
+ *                 description: Capacidad máxima
  *     responses:
  *       201:
- *         description: Garage created successfully
+ *         description: Garaje creado exitosamente
  */
 router.post('/', createGaraje);
 
-// Agregar configuración a un garaje específico
 /**
  * @swagger
  * /api/garages/{idGaraje}/horarios:
  *   post:
- *     summary: Add schedule to a garage
- *     tags: [Garages]
+ *     summary: Agregar horario semanal a un garaje
+ *     tags: [Garajes]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -46,9 +72,10 @@ router.post('/', createGaraje);
  *         required: true
  *         schema:
  *           type: string
+ *         description: ID del garaje
  *     responses:
  *       200:
- *         description: Schedule added successfully
+ *         description: Horario agregado exitosamente
  */
 router.post('/:idGaraje/horarios', addHorario);
 
@@ -56,8 +83,8 @@ router.post('/:idGaraje/horarios', addHorario);
  * @swagger
  * /api/garages/{idGaraje}/servicios:
  *   post:
- *     summary: Add additional service to a garage
- *     tags: [Garages]
+ *     summary: Agregar servicio adicional a un garaje
+ *     tags: [Garajes]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -66,9 +93,10 @@ router.post('/:idGaraje/horarios', addHorario);
  *         required: true
  *         schema:
  *           type: string
+ *         description: ID del garaje
  *     responses:
  *       200:
- *         description: Service added successfully
+ *         description: Servicio adicional agregado exitosamente
  */
 router.post('/:idGaraje/servicios', addServicioAdicional);
 
@@ -76,8 +104,8 @@ router.post('/:idGaraje/servicios', addServicioAdicional);
  * @swagger
  * /api/garages/{idGaraje}/bloquear-fecha:
  *   post:
- *     summary: Block a date for a garage
- *     tags: [Garages]
+ *     summary: Bloquear una fecha específica en un garaje
+ *     tags: [Garajes]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -86,17 +114,19 @@ router.post('/:idGaraje/servicios', addServicioAdicional);
  *         required: true
  *         schema:
  *           type: string
+ *         description: ID del garaje
  *     responses:
  *       200:
- *         description: Date blocked successfully
+ *         description: Fecha bloqueada exitosamente
  */
 router.post('/:idGaraje/bloquear-fecha', blockDate);
+
 /**
  * @swagger
  * /api/garages/{idGaraje}/imagenes:
  *   post:
- *     summary: Add image to a garage
- *     tags: [Garages]
+ *     summary: Subir imagen de un garaje
+ *     tags: [Garajes]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -105,9 +135,21 @@ router.post('/:idGaraje/bloquear-fecha', blockDate);
  *         required: true
  *         schema:
  *           type: string
+ *         description: ID del garaje
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               imagen:
+ *                 type: string
+ *                 format: binary
+ *                 description: Imagen del garaje
  *     responses:
  *       200:
- *         description: Image added successfully
+ *         description: Imagen subida exitosamente
  */
 router.post('/:idGaraje/imagenes', upload.single('imagen'), addImagen);
 
