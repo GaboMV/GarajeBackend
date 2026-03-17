@@ -223,20 +223,21 @@ const googleSignIn = async (req, res, next) => {
             return res.status(400).json({ error: 'idToken de Google es requerido' });
         }
 
-        const clientID = process.env.GOOGLE_CLIENT_ID;
-        if (!clientID) {
+        const clientIDs = process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.split(',').map(id => id.trim()) : [];
+        
+        if (clientIDs.length === 0) {
             return res.status(501).json({
                 error: 'Google Sign-In no configurado en el servidor.',
-                instrucciones: 'Configura GOOGLE_CLIENT_ID en el archivo .env para activar este endpoint.'
+                instrucciones: 'Configura GOOGLE_CLIENT_ID en el archivo .env (puedes poner varios separados por coma).'
             });
         }
 
-        const client = new OAuth2Client(clientID);
+        const client = new OAuth2Client(); // No pasamos ID aquí si usaremos varios en verifyIdToken
 
         // Verificar el idToken con Google Auth Library
         const ticket = await client.verifyIdToken({
             idToken: idToken,
-            audience: clientID,
+            audience: clientIDs, // google-auth-library acepta un array de IDs
         });
 
         const payload = ticket.getPayload();
