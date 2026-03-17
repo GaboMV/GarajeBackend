@@ -6,7 +6,10 @@ const {
     addHorario,
     addServicioAdicional,
     blockDate,
-    addImagen
+    addImagen,
+    getMyGarages,
+    getGarageById,
+    updateGarage
 } = require('../controllers/garage.controller');
 
 const { requireAuth, requireVerifiedKYC } = require('../middlewares/auth.middleware');
@@ -57,6 +60,81 @@ router.use(requireVerifiedKYC);
  *         description: Garaje creado exitosamente
  */
 router.post('/', createGaraje);
+
+/**
+ * @swagger
+ * /api/garages/me:
+ *   get:
+ *     summary: Obtener los garajes del usuario autenticado
+ *     tags: [Garajes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de garajes obtenida exitosamente
+ */
+router.get('/me', getMyGarages);
+
+/**
+ * @swagger
+ * /api/garages/{idGaraje}:
+ *   get:
+ *     summary: Obtener el detalle completo de un garaje específico
+ *     tags: [Garajes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: idGaraje
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del garaje
+ *     responses:
+ *       200:
+ *         description: Detalle del garaje obtenido exitosamente
+ *       404:
+ *         description: Garaje no encontrado
+ */
+router.get('/:idGaraje', getGarageById);
+
+/**
+ * @swagger
+ * /api/garages/{idGaraje}:
+ *   put:
+ *     summary: Editar un garaje existente
+ *     tags: [Garajes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: idGaraje
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del garaje
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nombre: { type: string }
+ *               descripcion: { type: string }
+ *               direccion: { type: string }
+ *               precio_hora: { type: number }
+ *               precio_dia: { type: number }
+ *               capacidad_puestos: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Garaje actualizado exitosamente
+ *       403:
+ *         description: No tienes permisos sobre este garaje
+ *       404:
+ *         description: Garaje no encontrado
+ */
+router.put('/:idGaraje', updateGarage);
 
 /**
  * @swagger

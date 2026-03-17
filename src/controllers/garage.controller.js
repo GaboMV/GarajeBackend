@@ -183,10 +183,112 @@ const addImagen = async (req, res, next) => {
     }
 }
 
+/**
+ * 6. Get Garages for the logged-in User
+ * Listar los garajes que pertenecen al usuario (Mis Garajes)
+ */
+const getMyGarages = async (req, res, next) => {
+    try {
+        const id_dueno = req.user.id;
+        const garajes = await prisma.garaje.findMany({
+            where: { id_dueno },
+            include: {
+                imagenes: true,
+                horarios_semanales: true
+            }
+        });
+        res.json({ garajes });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * 7. Get Garage By Id
+ * Ver el detalle completo de un garaje
+ */
+const getGarageById = async (req, res, next) => {
+    try {
+        const { idGaraje } = req.params;
+        const garaje = await prisma.garaje.findUnique({
+            where: { id: idGaraje },
+            include: {
+                imagenes: true,
+                horarios_semanales: true,
+                servicios_adicionales: true,
+                fechas_bloqueadas: true,
+                dueno: {
+                    select: {
+                        nombre_completo: true,
+                        url_foto_perfil: true
+                    }
+                }
+            }
+        });
+
+        if (!garaje) {
+            return res.status(404).json({ error: 'Garaje no encontrado' });
+        }
+
+        res.json({ garaje });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * 8. Update Garage Details
+ * Editar información de un garaje existente
+ */
+const updateGarage = async (req, res, next) => {
+    try {
+        const id_dueno = req.user.id;
+        const { idGaraje } = req.params;
+        const {
+            nombre, descripcion, direccion,
+            latitud, longitud, precio_hora, precio_dia,
+            minimo_horas, tiempo_limpieza, capacidad_puestos,
+            tiene_wifi, tiene_bano, tiene_electricidad, tiene_mesa
+        } = req.body;
+
+        const garajeExistente = await prisma.garaje.findUnique({ where: { id: idGaraje } });
+        if (!garajeExistente || garajeExistente.id_dueno !== id_dueno) {
+            return res.status(403).json({ error: 'No tienes permisos para editar este garaje' });
+        }
+
+        const garajeActualizado = await prisma.garaje.update({
+            where: { id: idGaraje },
+            data: {
+                nombre: nombre !== undefined ? nombre : garajeExistente.nombre,
+                descripcion: descripcion !== undefined ? descripcion : garajeExistente.descripcion,
+                direccion: direccion !== undefined ? direccion : garajeExistente.direccion,
+                latitud: latitud !== undefined ? latitud : garajeExistente.latitud,
+                longitud: longitud !== undefined ? longitud : garajeExistente.longitud,
+                precio_hora: precio_hora !== undefined ? precio_hora : garajeExistente.precio_hora,
+                precio_dia: precio_dia !== undefined ? precio_dia : garajeExistente.precio_dia,
+                minimo_horas: minimo_horas !== undefined ? minimo_horas : garajeExistente.minimo_horas,
+                tiempo_limpieza: tiempo_limpieza !== undefined ? tiempo_limpieza : garajeExistente.tiempo_limpieza,
+                capacidad_puestos: capacidad_puestos !== undefined ? capacidad_puestos : garajeExistente.capacidad_puestos,
+                tiene_wifi: tiene_wifi !== undefined ? tiene_wifi : garajeExistente.tiene_wifi,
+                tiene_bano: tiene_bano !== undefined ? tiene_bano : garajeExistente.tiene_bano,
+                tiene_electricidad: tiene_electricidad !== undefined ? tiene_electricidad : garajeExistente.tiene_electricidad,
+                tiene_mesa: tiene_mesa !== undefined ? tiene_mesa : garajeExistente.tiene_mesa,
+            }
+        });
+
+        res.json({ message: 'Garaje actualizado exitosamente', garaje: garajeActualizado });
+    } catch (error) {
+        next(error);
+    }
+}
+
 module.exports = {
     createGaraje,
     addHorario,
     addServicioAdicional,
     blockDate,
-    addImagen
+    addImagen,
+    getMyGarages,
+    getGarageById,
+    updateGarage
 };

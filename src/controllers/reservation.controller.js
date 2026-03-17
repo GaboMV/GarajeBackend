@@ -252,7 +252,124 @@ const payReservation = async (req, res, next) => {
     }
 }
 
+/**
+ * 3. Get mis reservas (Vendedor / Cliente)
+ * Lista todas las reservas que el usuario actual ha realizado.
+ */
+const getMyReservations = async (req, res, next) => {
+    try {
+        const id_vendedor = req.user.id;
+        const reservas = await prisma.reserva.findMany({
+            where: { id_vendedor },
+            include: {
+                garaje: {
+                    select: {
+                        nombre: true,
+                        direccion: true
+                    }
+                },
+                fechas: true
+            },
+            orderBy: { fecha_creacion: 'desc' }
+        });
+
+        res.json({ reservas });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * 4. Get Reservas Recibidas (Dueño de Garaje)
+ * Lista las reservas hechas hacia los garajes que posee el usuario.
+ */
+const getOwnerReservations = async (req, res, next) => {
+    try {
+        const id_dueno = req.user.id;
+        const reservas = await prisma.reserva.findMany({
+            where: {
+                garaje: {
+                    id_dueno
+                }
+            },
+            include: {
+                garaje: {
+                    select: {
+                        nombre: true
+                    }
+                },
+                vendedor: {
+                    select: {
+                        nombre_completo: true,
+                        correo: true,
+                        url_foto_perfil: true
+                    }
+                },
+                fechas: true
+            },
+            orderBy: { fecha_creacion: 'desc' }
+        });
+
+        res.json({ reservas });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * 5. Get Reservation By ID
+ * Detalle completo de una reserva (para el dueño o el cliente)
+ */
+const getReservationById = async (req, res, next) => {
+    try {
+        const { idReserva } = req.params;
+        const userId = req.user.id;
+
+        const reserva = await prisma.reserva.findUnique({
+            where: { id: idReserva },
+            include: {
+                garaje: {
+                    include: {
+                        dueno: {
+                            select: { id: true, nombre_completo: true, url_foto_perfil: true }
+                        }
+                    }
+                },
+                vendedor: {
+                    select: { id: true, nombre_completo: true, url_foto_perfil: true }
+                },
+                fechas: {
+                    include: { evidencias: true }
+                },
+                comprobante_pago: true,
+                servicios_extra: {
+                    include: { servicio: true }
+                }
+            }
+        });
+
+        if (!reserva) {
+            return res.status(404).json({ error: 'Reserva no encontrada' });
+        }
+
+        // Verificar permisos (solo el dueño del garaje o el cliente que reservó pueden verla)
+        const isOwner = reserva.garaje.id_dueno === userId;
+        const isClient = reserva.id_vendedor === userId;
+
+        if (!isOwner && !isClient) {
+            return res.status(403).json({ error: 'No tienes permisos para ver esta reserva' });
+        }
+
+        res.json({ reserva });
+    } catch (error) {
+        next(error);
+    }
+}
+
 module.exports = {
     createReservation,
-    payReservation
+    payReservation,
+    getMyReservations,
+    getOwnerReservations,
+    getReservationById
 };

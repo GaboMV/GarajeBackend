@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { register, login, approveUser, uploadKyc, getUserKyc, googleSignIn } = require('../controllers/user.controller');
+const { register, login, approveUser, uploadKyc, getUserKyc, googleSignIn, getUserProfile } = require('../controllers/user.controller');
 const { requireAuth, requireAdmin } = require('../middlewares/auth.middleware');
 const upload = require('../middlewares/upload.middleware');
 
@@ -126,6 +126,22 @@ router.post('/login', login);
 router.post('/auth/google', googleSignIn);
 
 // Rutas protegidas (requieren token JWT)
+/**
+ * @swagger
+ * /api/users/profile:
+ *   get:
+ *     summary: Obtener perfil del usuario autenticado
+ *     tags: [Usuarios]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Perfil del usuario obtenido exitosamente
+ *       404:
+ *         description: Usuario no encontrado
+ */
+router.get('/profile', requireAuth, getUserProfile);
+
 /**
  * @swagger
  * /api/users/kyc:

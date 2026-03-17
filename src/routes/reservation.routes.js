@@ -1,12 +1,65 @@
 const express = require('express');
 const router = express.Router();
 
-const { createReservation, payReservation } = require('../controllers/reservation.controller');
+const { createReservation, payReservation, getMyReservations, getOwnerReservations, getReservationById } = require('../controllers/reservation.controller');
 const { requireAuth, requireVerifiedKYC } = require('../middlewares/auth.middleware');
 
 // La reserva requiere estar autenticado y verificado
 router.use(requireAuth);
 router.use(requireVerifiedKYC);
+
+/**
+ * @swagger
+ * /api/reservations/me:
+ *   get:
+ *     summary: Obtener mis reservas (como cliente/vendedor)
+ *     tags: [Reservas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de reservas obtenida exitosamente
+ */
+router.get('/me', getMyReservations);
+
+/**
+ * @swagger
+ * /api/reservations/owner:
+ *   get:
+ *     summary: Obtener las reservas recibidas (como dueño de garaje)
+ *     tags: [Reservas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de reservas recibidas obtenida exitosamente
+ */
+router.get('/owner', getOwnerReservations);
+
+/**
+ * @swagger
+ * /api/reservations/{idReserva}:
+ *   get:
+ *     summary: Obtener el detalle de una reserva específica
+ *     tags: [Reservas]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: idReserva
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID de la reserva
+ *     responses:
+ *       200:
+ *         description: Detalle de la reserva obtenido exitosamente
+ *       403:
+ *         description: No tienes permisos para ver esta reserva
+ *       404:
+ *         description: Reserva no encontrada
+ */
+router.get('/:idReserva', getReservationById);
 
 /**
  * @swagger
