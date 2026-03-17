@@ -71,20 +71,17 @@ router.post('/login', login);
 
 /**
  * @swagger
- * /api/users/auth/google:
+ * /api/users/google:
  *   post:
- *     summary: Iniciar sesión / Registrarse con Google (Firebase)
+ *     summary: Iniciar sesión / Registrarse con Google (OAuth 2.0)
  *     description: |
- *       El cliente autentica al usuario con Google usando el SDK de Firebase.
- *       Luego envía el `idToken` que devuelve Firebase a este endpoint.
- *       El backend lo verifica, busca o crea el usuario local, y retorna un JWT propio.
+ *       El cliente autentica al usuario con Google directamente en Flutter.
+ *       Luego envía el `idToken` a este endpoint.
+ *       El backend lo verifica usando `google-auth-library`, busca o crea el usuario local, y retorna un JWT propio.
  *
  *       **Notas importantes:**
- *       - Este endpoint reemplaza el flujo "Continuar con Google" del frontend.
- *       - No existe ni se necesita pantalla de OTP. El JWT se retorna directamente.
- *       - El campo `modo_actual` en la respuesta indica si el usuario ya eligió su rol
- *         o debe navegar a la pantalla de selección de modo.
- *       - Requiere `src/config/firebase.admin.js` inicializado (ver instrucciones).
+ *       - No requiere Firebase.
+ *       - Requiere `GOOGLE_CLIENT_ID` configurado en el `.env`.
  *     tags: [Usuarios]
  *     requestBody:
  *       required: true
@@ -97,33 +94,18 @@ router.post('/login', login);
  *             properties:
  *               idToken:
  *                 type: string
- *                 description: Token ID de Firebase obtenido tras autenticar con Google en el cliente
+ *                 description: Token ID de Google obtenido tras autenticar en el cliente
  *     responses:
  *       200:
- *         description: JWT propio retornado. Navegar a selección de modo si `modo_actual` es null.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 token:
- *                   type: string
- *                 user:
- *                   type: object
- *                   properties:
- *                     id: { type: string }
- *                     correo: { type: string }
- *                     nombre_completo: { type: string }
- *                     esta_verificado: { type: boolean }
- *                     modo_actual: { type: string, nullable: true }
+ *         description: JWT propio retornado.
  *       400:
  *         description: idToken faltante o inválido
  *       401:
- *         description: Token de Google expirado
+ *         description: Token de Google expirado o inválido
  *       501:
- *         description: Firebase Admin aún no configurado en el servidor
+ *         description: Google Client ID aún no configurado en el servidor
  */
-router.post('/auth/google', googleSignIn);
+router.post('/google', googleSignIn);
 
 // Rutas protegidas (requieren token JWT)
 /**

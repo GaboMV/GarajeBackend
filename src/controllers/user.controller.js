@@ -2,6 +2,7 @@
 const prisma = require('../db/prisma');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const { uploadFilePrivate } = require('../services/upload.service');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret_garajes_dev_123';
@@ -222,42 +223,45 @@ const googleSignIn = async (req, res, next) => {
             return res.status(400).json({ error: 'idToken de Google es requerido' });
         }
 
-        // Verificar el idToken con Firebase Admin SDK
-        // Requiere inicializar firebase-admin con las credenciales del proyecto.
-        // Por ahora el endpoint existe y está documentado; la inicialización de
-        // firebase-admin se completa cuando el equipo provea el Service Account JSON.
-        let firebaseAdmin;
-        try {
-            firebaseAdmin = require('../config/firebase.admin');
-        } catch (e) {
+        const clientID = process.env.GOOGLE_CLIENT_ID;
+        if (!clientID) {
             return res.status(501).json({
-                error: 'Google Sign-In aún no configurado en el servidor.',
-                instrucciones: 'Configura src/config/firebase.admin.js con el Service Account de Firebase para activar este endpoint.'
+                error: 'Google Sign-In no configurado en el servidor.',
+                instrucciones: 'Configura GOOGLE_CLIENT_ID en el archivo .env para activar este endpoint.'
             });
         }
 
-        const decoded = await firebaseAdmin.auth().verifyIdToken(idToken);
-        const { email, name, uid } = decoded;
+        const client = new OAuth2Client(clientID);
+
+        // Verificar el idToken con Google Auth Library
+        const ticket = await client.verifyIdToken({
+            idToken: idToken,
+            audience: clientID,
+        });
+
+        const payload = ticket.getPayload();
+        const { email, name, sub: google_uid } = payload;
 
         if (!email) {
             return res.status(400).json({ error: 'El token de Google no contiene un correo electrónico.' });
         }
 
-        // Buscar usuario existente o crear uno nuevo (sin contraseña)
+        // Buscar usuario existente o crear uno nuevo
         let user = await prisma.usuario.findUnique({ where: { correo: email } });
 
         if (!user) {
             user = await prisma.usuario.create({
                 data: {
                     correo: email,
-                    password: `google_uid_${uid}`, // contraseña placeholder; no usable para login clásico
+                    password: `google_oauth_${google_uid}`, // contraseña placeholder
                     nombre_completo: name || null,
-                    esta_verificado: false
+                    esta_verificado: false,
+                    modo_actual: 'VENDEDOR' // Valor por defecto
                 }
             });
         }
 
-        const token = jwt.sign({ id: user.id, correo: user.correo }, JWT_SECRET, {
+        const token = jwt.sign({ id: user.id, correo: user.correo, es_admin: user.es_admin }, JWT_SECRET, {
             expiresIn: '7d'
         });
 
@@ -273,13 +277,8 @@ const googleSignIn = async (req, res, next) => {
             }
         });
     } catch (error) {
-        if (error.code === 'auth/id-token-expired') {
-            return res.status(401).json({ error: 'El token de Google expiró. Vuelve a iniciar sesión.' });
-        }
-        if (error.code === 'auth/argument-error') {
-            return res.status(400).json({ error: 'Token de Google inválido.' });
-        }
-        next(error);
+        console.error('Error en Google Auth:', error);
+        return res.status(401).json({ error: 'Token de Google inválido o expirado.' });
     }
 };
 
