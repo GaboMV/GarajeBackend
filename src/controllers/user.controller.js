@@ -283,11 +283,43 @@ const googleSignIn = async (req, res, next) => {
     }
 };
 
+/**
+ * User Profile
+ * Usado para refrescar los datos del usuario en el frontend
+ */
+const getUserProfile = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const user = await prisma.usuario.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                correo: true,
+                nombre_completo: true,
+                esta_verificado: true,
+                modo_actual: true,
+                url_foto_perfil: true,
+                dni_foto_url: true,
+                selfie_url: true,
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+
+        res.json({ user });
+    } catch (error) {
+        next(error);
+    }
+}
+
 module.exports = {
     register,
     uploadKyc,
     getUserKyc,
     approveUser,
     login,
-    googleSignIn
+    googleSignIn,
+    getUserProfile
 };
