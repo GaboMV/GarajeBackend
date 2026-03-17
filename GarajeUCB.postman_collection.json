@@ -240,7 +240,7 @@
 	"variable": [
 		{
 			"key": "baseUrl",
-			"value": "http://localhost:3000/api",
+			"value": "https://garaje-backend-api.onrender.com/api",
 			"type": "string"
 		},
 		{

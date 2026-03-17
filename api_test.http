@@ -2,6 +2,8 @@
 # Esta suite de pruebas es compatible con la extensión REST Client de VS Code
 
 @baseUrl = http://localhost:3000/api
+# URL de Producción:
+# @baseUrl = https://garaje-backend-api.onrender.com/api
 @authToken = {{login.response.body.token}}
 @adminToken = {{adminLogin.response.body.token}}
 
