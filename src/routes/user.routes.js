@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { register, login, approveUser, uploadKyc, getUserKyc, googleSignIn, getUserProfile, getPendingKycUsers } = require('../controllers/user.controller');
+const { register, login, approveUser, rejectUser, uploadKyc, getUserKyc, googleSignIn, getUserProfile, getPendingKycUsers } = require('../controllers/user.controller');
 const { requireAuth, requireAdmin } = require('../middlewares/auth.middleware');
 const upload = require('../middlewares/upload.middleware');
 
@@ -211,5 +211,40 @@ router.get('/kyc/:idUsuario', requireAuth, requireAdmin, getUserKyc);
  *         description: Usuario aprobado exitosamente
  */
 router.post('/approve/:idUsuario', requireAuth, requireAdmin, approveUser);
+
+/**
+ * @swagger
+ * /api/users/reject/{idUsuario}:
+ *   post:
+ *     summary: Rechazar verificación de usuario con un motivo (solo admin)
+ *     tags: [Usuarios]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: idUsuario
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del usuario a rechazar
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - motivo
+ *             properties:
+ *               motivo:
+ *                 type: string
+ *                 description: Razón por la cual se rechaza el KYC
+ *     responses:
+ *       200:
+ *         description: Usuario rechazado correctamente
+ *       400:
+ *         description: Falta el motivo de rechazo
+ */
+router.post('/reject/:idUsuario', requireAuth, requireAdmin, rejectUser);
 
 module.exports = router;

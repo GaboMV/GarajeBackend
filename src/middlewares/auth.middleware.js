@@ -40,9 +40,11 @@ const requireAuth = async (req, res, next) => {
  * Debe ir después de 'requireAuth'
  */
 const requireVerifiedKYC = (req, res, next) => {
-    if (!req.user || !req.user.esta_verificado) {
+    if (!req.user || req.user.esta_verificado !== 'VERIFICADO') {
         return res.status(403).json({
-            error: 'KYC Pendiente. Debes subir tu foto y DNI y esperar la validación del Administrador para realizar esta acción.'
+            error: 'KYC no verificado.',
+            status: req.user ? req.user.esta_verificado : 'NO_AUTH',
+            message: 'Debes contar con la validación del Administrador para realizar esta acción.'
         });
     }
     next();

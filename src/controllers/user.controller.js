@@ -35,7 +35,7 @@ const register = async (req, res, next) => {
                 correo,
                 password: hashedPassword,
                 nombre_completo: nombre_completo || null,
-                esta_verificado: false // Nace sin verificar
+                esta_verificado: "NO_VERIFICADO" // Nace sin subir nada
             }
         });
 
@@ -87,7 +87,8 @@ const uploadKyc = async (req, res, next) => {
             data: {
                 dni_foto_url,
                 selfie_url,
-                // El usuario NO SE VERIFICA AUN. Debe hacerlo el admin.
+                // El usuario pasa a PENDIENTE de revisión
+                esta_verificado: "PENDIENTE"
             }
         });
 
@@ -149,7 +150,10 @@ const approveUser = async (req, res, next) => {
 
         const approvedUser = await prisma.usuario.update({
             where: { id: idUsuario },
-            data: { esta_verificado: true }
+            data: { 
+                esta_verificado: "VERIFICADO",
+                motivo_rechazo_kyc: null // Limpiamos motivo si se aprueba
+            }
         });
 
         res.json({
@@ -262,7 +266,7 @@ const googleSignIn = async (req, res, next) => {
                     correo: email,
                     password: `google_oauth_${google_uid}`,
                     nombre_completo: name || null,
-                    esta_verificado: false,
+                    esta_verificado: "NO_VERIFICADO",
                     modo_actual: 'VENDEDOR'
                 }
             });
@@ -291,17 +295,40 @@ const googleSignIn = async (req, res, next) => {
 };
 
 /**
- * Admin: List users with pending KYC
- * Busca usuarios que no están verificados pero que tienen documentos subidos.
+ * Admin: Reject User Verification
+ * Un admin revisa las fotos y rechaza la solicitud con un motivo
+ */
+const rejectUser = async (req, res, next) => {
+    try {
+        const { idUsuario } = req.params;
+        const { motivo } = req.body;
+
+        if (!motivo) return res.status(400).json({ error: 'Debes proporcionar un motivo de rechazo' });
+
+        const rejectedUser = await prisma.usuario.update({
+            where: { id: idUsuario },
+            data: { 
+                esta_verificado: "RECHAZADO",
+                motivo_rechazo_kyc: motivo
+            }
+        });
+
+        res.json({ message: 'Usuario rechazado correctamente', user: rejectedUser });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * Admin: List users with pending or rejected KYC
  */
 const getPendingKycUsers = async (req, res, next) => {
     try {
         console.log("Admin Request: getPendingKycUsers initiate");
+
         const users = await prisma.usuario.findMany({
             where: {
-                esta_verificado: false,
-                dni_foto_url: { not: null },
-                selfie_url: { not: null }
+                esta_verificado: { in: ["PENDIENTE", "RECHAZADO"] }
             },
             select: {
                 id: true,
@@ -309,15 +336,15 @@ const getPendingKycUsers = async (req, res, next) => {
                 nombre_completo: true,
                 fecha_creacion: true,
                 dni_foto_url: true,
-                selfie_url: true
+                selfie_url: true,
+                esta_verificado: true,
+                motivo_rechazo_kyc: true
             }
         });
 
-        console.log(`Admin Request: found ${users.length} pending users`);
-        res.json({
-            count: users.length,
-            solicitudes: users
-        });
+        console.log(`Admin Request: Found ${users.length} users with PENDING or RECHAZADO status`);
+
+        res.json({ count: users.length, users });
     } catch (error) {
         console.error("CRITICAL ERROR in getPendingKycUsers:", error);
         next(error);
@@ -342,6 +369,7 @@ const getUserProfile = async (req, res, next) => {
                 url_foto_perfil: true,
                 dni_foto_url: true,
                 selfie_url: true,
+                motivo_rechazo_kyc: true,
             }
         });
 
@@ -360,6 +388,7 @@ module.exports = {
     uploadKyc,
     getUserKyc,
     approveUser,
+    rejectUser,
     login,
     googleSignIn,
     getUserProfile,

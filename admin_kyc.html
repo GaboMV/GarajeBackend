@@ -114,12 +114,25 @@
 
         button.secondary { background: rgba(255, 255, 255, 0.1); }
         button.btn-approve { background: var(--success); }
+        button.btn-reject { background: #334155; }
+        button.btn-reject:hover { background: var(--error); }
 
         /* Tables */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th { text-align: left; padding: 16px; color: var(--text-dim); font-weight: 400; border-bottom: 1px solid var(--border); }
         td { padding: 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
         tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-pending { background: #f59e0b; color: #fff; }
+        .badge-rejected { background: var(--error); color: #fff; }
+        .badge-verified { background: var(--success); color: #fff; }
 
         /* Modal */
         .modal-overlay {
@@ -131,6 +144,7 @@
         .modal {
             background: #1e293b; padding: 30px; border-radius: 20px;
             max-width: 90%; width: 850px; max-height: 90vh; overflow-y: auto;
+            position: relative;
         }
 
         .image-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
@@ -178,7 +192,7 @@
         <div id="section-kyc">
             <table>
                 <thead>
-                    <tr><th>Usuario</th><th>Fecha</th><th>Acción</th></tr>
+                    <tr><th>Usuario</th><th>Fecha</th><th>Estado</th><th>Acción</th></tr>
                 </thead>
                 <tbody id="kyc-table-body"></tbody>
             </table>
@@ -200,12 +214,15 @@
         <div class="modal">
             <h2>Revisar KYC</h2>
             <p id="kyc-user-info" style="color: var(--text-dim); margin-top: 5px;"></p>
+            <div id="kyc-reject-reason-box" class="hidden" style="margin-top: 10px; color: var(--error); font-size: 0.9rem; border-left: 2px solid var(--error); padding-left: 10px;"></div>
+            
             <div class="image-grid">
                 <div class="image-card"><label>DNI / Documento</label><img id="img-dni" onclick="window.open(this.src)"></div>
                 <div class="image-card"><label>Selfie de Validación</label><img id="img-selfie" onclick="window.open(this.src)"></div>
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 10px;">
                 <button onclick="closeModals()" class="secondary">Cerrar</button>
+                <button id="btn-reject-user" class="btn-reject">Rechazar</button>
                 <button id="btn-approve-user" class="btn-approve">Aprobar Usuario</button>
             </div>
         </div>
@@ -259,7 +276,6 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error);
 
-                // SEGURIDAD: Verificar que sea admin EN EL LOGIN
                 if (!data.user.es_admin) {
                     throw new Error("Acceso Restringido: Esta cuenta no tiene permisos de administrador.");
                 }
@@ -290,7 +306,7 @@
 
         async function loadKYC() {
             const tbody = document.getElementById('kyc-table-body');
-            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Cargando...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">Cargando...</td></tr>';
             
             try {
                 const res = await fetch(`${API_BASE}/users/kyc/pending`, { headers: { Authorization: `Bearer ${token}` } });
@@ -298,21 +314,19 @@
                 
                 if (!res.ok) throw new Error(data.error || "Error al cargar KYC");
 
-                const solicitudes = data.solicitudes || [];
-                tbody.innerHTML = solicitudes.length ? '' : '<tr><td colspan="3" style="text-align:center">Sin pendientes</td></tr>';
-                solicitudes.forEach(u => {
+                const usuarios = data.users || [];
+                tbody.innerHTML = usuarios.length ? '' : '<tr><td colspan="4" style="text-align:center">Sin pendientes</td></tr>';
+                usuarios.forEach(u => {
+                    const badgeClass = u.esta_verificado === 'PENDIENTE' ? 'badge-pending' : 'badge-rejected';
                     tbody.innerHTML += `<tr>
-                        <td><b>${u.nombre_completo}</b><br><small>${u.correo}</small></td>
+                        <td><b>${u.nombre_completo || 'Sin nombre'}</b><br><small>${u.correo}</small></td>
                         <td>${new Date(u.fecha_creacion).toLocaleDateString()}</td>
-                        <td><button onclick="openKYC('${u.id}', '${u.correo}')">Revisar</button></td>
+                        <td><span class="badge ${badgeClass}">${u.esta_verificado}</span></td>
+                        <td><button onclick="openKYC('${u.id}', '${u.correo}', '${u.esta_verificado}', '${u.motivo_rechazo_kyc || ""}')">Revisar</button></td>
                     </tr>`;
                 });
             } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--error)">${e.message}</td></tr>`;
-                if (e.message.includes("administrador")) {
-                    alert("Tu sesión ha expirado o ya no tienes permisos.");
-                    logout();
-                }
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--error)">${e.message}</td></tr>`;
             }
         }
 
@@ -340,19 +354,28 @@
             }
         }
 
-        async function openKYC(id, email) {
+        async function openKYC(id, email, status, reason) {
             currentId = id;
             try {
                 const res = await fetch(`${API_BASE}/users/kyc/${id}`, { headers: { Authorization: `Bearer ${token}` } });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error);
 
-                document.getElementById('kyc-user-info').innerText = email;
+                document.getElementById('kyc-user-info').innerText = email + ` (${status})`;
+                
+                const reasonBox = document.getElementById('kyc-reject-reason-box');
+                if (reason) {
+                    reasonBox.innerText = `Motivo de rechazo previo: ${reason}`;
+                    reasonBox.classList.remove('hidden');
+                } else {
+                    reasonBox.classList.add('hidden');
+                }
+
                 document.getElementById('img-dni').src = data.documentos_temporales_5min.dni_frontal;
                 document.getElementById('img-selfie').src = data.documentos_temporales_5min.selfie;
                 
-                // Configurar botón aprobación
                 document.getElementById('btn-approve-user').onclick = () => approveAction('user');
+                document.getElementById('btn-reject-user').onclick = () => rejectUser();
                 
                 document.getElementById('modal-kyc').classList.remove('hidden');
             } catch (e) { alert(e.message); }
@@ -375,7 +398,7 @@
                 legalContent.innerHTML = `<p style="color:var(--error)">No se adjuntó documento de propiedad</p>`;
             }
 
-            document.getElementById('garage-images').innerHTML = garage.imagenes.map(i => `<div class="image-card"><img src="${i.url}" onclick="window.open(this.src)"></div>`).join('');
+            document.getElementById('garage-images').innerHTML = (garage.imagenes || []).map(i => `<div class="image-card"><img src="${i.url}" onclick="window.open(this.src)"></div>`).join('');
             document.getElementById('modal-garage').classList.remove('hidden');
         }
 
@@ -390,6 +413,30 @@
                 closeModals();
                 type === 'user' ? loadKYC() : loadGarages();
             } catch (e) { alert('Error al aprobar: ' + e.message); }
+        }
+
+        async function rejectUser() {
+            const motivo = prompt("Por favor, ingresa el motivo del rechazo para enviárselo al usuario:");
+            if (!motivo) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/users/reject/${currentId}`, {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ motivo })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+
+                alert('Usuario rechazado y motivo guardado.');
+                closeModals();
+                loadKYC();
+            } catch (e) { 
+                alert('Error al rechazar: ' + e.message); 
+            }
         }
 
         function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden')); }

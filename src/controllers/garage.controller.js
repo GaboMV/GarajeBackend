@@ -346,8 +346,12 @@ const approveGarage = async (req, res, next) => {
 
         // REGLAS DE NEGOCIO:
         // 1. El dueño debe estar verificado (KYC)
-        if (!garage.dueno.esta_verificado) {
-            return res.status(400).json({ error: 'El dueño no está verificado (KYC pendiente). No se puede aprobar el garaje.' });
+        if (garage.dueno.esta_verificado !== 'VERIFICADO') {
+            return res.status(400).json({ 
+                error: 'El dueño no está verificado.',
+                status: garage.dueno.esta_verificado,
+                message: 'No se puede aprobar el garaje hasta que el dueño complete satisfactoriamente su KYC.'
+            });
         }
 
         // 2. Debe tener documento de propiedad subido
