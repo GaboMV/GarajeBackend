@@ -166,7 +166,7 @@ router.post('/kyc', requireAuth, upload.fields([{ name: 'dni_foto', maxCount: 1 
  *       200:
  *         description: Lista de usuarios pendientes de verificación
  */
-router.get('/kyc/pending', requireAdmin, getPendingKycUsers);
+router.get('/kyc/pending', requireAuth, requireAdmin, getPendingKycUsers);
 
 /**
  * @swagger
@@ -189,7 +189,7 @@ router.get('/kyc/pending', requireAdmin, getPendingKycUsers);
  *       404:
  *         description: Usuario no encontrado
  */
-router.get('/kyc/:idUsuario', requireAdmin, getUserKyc);
+router.get('/kyc/:idUsuario', requireAuth, requireAdmin, getUserKyc);
 
 /**
  * @swagger
@@ -210,6 +210,6 @@ router.get('/kyc/:idUsuario', requireAdmin, getUserKyc);
  *       200:
  *         description: Usuario aprobado exitosamente
  */
-router.post('/approve/:idUsuario', requireAdmin, approveUser);
+router.post('/approve/:idUsuario', requireAuth, requireAdmin, approveUser);
 
 module.exports = router;

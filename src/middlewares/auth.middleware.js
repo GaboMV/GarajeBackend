@@ -49,17 +49,13 @@ const requireVerifiedKYC = (req, res, next) => {
 }
 
 /**
- * Middleware temporal para simular Admin (solo para propósitos del ejercicio).
- * Idealmente usarías un role en la base de datos (por ende una tabla Role).
+ * Middleware para validar que el usuario es administrador.
+ * Debe ir después de 'requireAuth'
  */
 const requireAdmin = (req, res, next) => {
-    // Para simplificar, asumiremos que si envía una cabecera 'X-Admin-Token' con valor maestro entra.
-    const adminToken = req.headers['x-admin-token'];
-
-    if (adminToken !== 'soy-el-admin-secreto') {
+    if (!req.user || !req.user.es_admin) {
         return res.status(403).json({ error: 'Privilegios de administrador requeridos' });
     }
-
     next();
 }
 
