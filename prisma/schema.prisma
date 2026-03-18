@@ -56,6 +56,8 @@ model Garaje {
   tiene_bano          Boolean   @default(false) // renombrado de tiene_baño para evitar ñ
   tiene_electricidad  Boolean   @default(false)
   tiene_mesa          Boolean   @default(false)
+  esta_aprobado       Boolean   @default(false)
+  documento_propiedad_url String? // KEY del archivo en el bucket privado
   
   fecha_creacion      DateTime  @default(now())
   fecha_actualizacion DateTime  @updatedAt

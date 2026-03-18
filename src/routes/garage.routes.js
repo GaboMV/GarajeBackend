@@ -9,10 +9,12 @@ const {
     addImagen,
     getMyGarages,
     getGarageById,
-    updateGarage
+    updateGarage,
+    getPendingGarages,
+    approveGarage,
+    uploadPropertyDoc
 } = require('../controllers/garage.controller');
-
-const { requireAuth, requireVerifiedKYC } = require('../middlewares/auth.middleware');
+const { requireAuth, requireVerifiedKYC, requireAdmin } = require('../middlewares/auth.middleware');
 const upload = require('../middlewares/upload.middleware');
 
 // Todas estas rutas requieren estar autenticado y verificado
@@ -230,5 +232,38 @@ router.post('/:idGaraje/bloquear-fecha', blockDate);
  *         description: Imagen subida exitosamente
  */
 router.post('/:idGaraje/imagenes', upload.single('imagen'), addImagen);
+
+/**
+ * @swagger
+ * /api/garages/{idGaraje}/documento-propiedad:
+ *   post:
+ *     summary: Subir documento legal que comprueba la propiedad del garaje (Bucket PRIVADO)
+ *     tags: [Garajes]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/:idGaraje/documento-propiedad', requireAuth, upload.single('documento'), uploadPropertyDoc);
+
+/**
+ * @swagger
+ * /api/garages/admin/pending:
+ *   get:
+ *     summary: Listar garajes pendientes de aprobación (solo admin)
+ *     tags: [Garajes]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/admin/pending', requireAuth, requireAdmin, getPendingGarages);
+
+/**
+ * @swagger
+ * /api/garages/admin/approve/{idGaraje}:
+ *   post:
+ *     summary: Aprobar un garaje (solo admin)
+ *     tags: [Garajes]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/admin/approve/:idGaraje', requireAuth, requireAdmin, approveGarage);
 
 module.exports = router;

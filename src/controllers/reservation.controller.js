@@ -188,8 +188,8 @@ const payReservation = async (req, res, next) => {
             return res.status(403).json({ error: 'Reserva no encontrada o no tienes permisos' });
         }
 
-        if (reserva.estado !== 'PENDIENTE') {
-            return res.status(400).json({ error: `La reserva ya está en estado ${reserva.estado}` });
+        if (reserva.estado !== 'ACEPTADA') {
+            return res.status(400).json({ error: 'La reserva debe estar ACEPTADA por el dueño antes de pagarla.' });
         }
 
         await prisma.$transaction(async (tx) => {
@@ -366,10 +366,92 @@ const getReservationById = async (req, res, next) => {
     }
 }
 
+/**
+ * 6. Aprobar Reserva (Dueño de Garaje)
+ * El dueño acepta la solicitud del vendedor.
+ */
+const approveReservation = async (req, res, next) => {
+    try {
+        const id_dueno = req.user.id;
+        const { idReserva } = req.params;
+
+        const reserva = await prisma.reserva.findUnique({
+            where: { id: idReserva },
+            include: { garaje: true }
+        });
+
+        if (!reserva || reserva.garaje.id_dueno !== id_dueno) {
+            return res.status(403).json({ error: 'Reserva no encontrada o no tienes permisos' });
+        }
+
+        if (reserva.estado !== 'PENDIENTE') {
+            return res.status(400).json({ error: `No se puede aprobar una reserva en estado ${reserva.estado}` });
+        }
+
+        const updatedReserva = await prisma.reserva.update({
+            where: { id: idReserva },
+            data: { estado: 'ACEPTADA' }
+        });
+
+        res.json({
+            message: 'Reserva aprobada exitosamente. El cliente ahora puede proceder al pago.',
+            reserva: updatedReserva
+        });
+
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * 7. Rechazar/Cancelar Reserva (Dueño o Cliente)
+ */
+const rejectReservation = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const { idReserva } = req.params;
+
+        const reserva = await prisma.reserva.findUnique({
+            where: { id: idReserva },
+            include: { garaje: true }
+        });
+
+        if (!reserva) {
+            return res.status(404).json({ error: 'Reserva no encontrada' });
+        }
+
+        const isOwner = reserva.garaje.id_dueno === userId;
+        const isClient = reserva.id_vendedor === userId;
+
+        if (!isOwner && !isClient) {
+            return res.status(403).json({ error: 'No tienes permisos para esta acción' });
+        }
+
+        if (['PAGADA', 'EN_CURSO', 'COMPLETADA'].includes(reserva.estado)) {
+            return res.status(400).json({ error: 'No se puede rechazar una reserva que ya ha sido pagada o está en curso.' });
+        }
+
+        const updatedReserva = await prisma.reserva.update({
+            where: { id: idReserva },
+            data: { estado: 'CANCELADA' }
+        });
+
+        res.json({
+            message: 'Reserva cancelada/rechazada exitosamente.',
+            reserva: updatedReserva
+        });
+
+    } catch (error) {
+        next(error);
+    }
+}
+
 module.exports = {
     createReservation,
     payReservation,
     getMyReservations,
     getOwnerReservations,
-    getReservationById
+    getReservationById,
+    approveReservation,
+    rejectReservation
 };
