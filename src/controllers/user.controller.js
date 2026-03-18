@@ -307,7 +307,7 @@ const getPendingKycUsers = async (req, res, next) => {
                 id: true,
                 correo: true,
                 nombre_completo: true,
-                createdAt: true,
+                fecha_creacion: true,
                 dni_foto_url: true,
                 selfie_url: true
             }
