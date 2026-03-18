@@ -159,7 +159,7 @@
         <div id="error-msg"></div>
         <input type="email" id="email" placeholder="admin@garajes.com" style="margin-bottom: 15px;">
         <input type="password" id="password" placeholder="Contraseña" style="margin-bottom: 20px;">
-        <button onclick="login()" style="width: 100%;">Entrar</button>
+        <button onclick="login()" id="btn-login" style="width: 100%;">Entrar</button>
     </div>
 
     <!-- DASHBOARD -->
@@ -206,7 +206,7 @@
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 10px;">
                 <button onclick="closeModals()" class="secondary">Cerrar</button>
-                <button onclick="approveAction('user')" class="btn-approve">Aprobar Usuario</button>
+                <button id="btn-approve-user" class="btn-approve">Aprobar Usuario</button>
             </div>
         </div>
     </div>
@@ -228,7 +228,7 @@
             
             <div style="display: flex; justify-content: flex-end; gap: 10px;">
                 <button onclick="closeModals()" class="secondary">Cerrar</button>
-                <button onclick="approveAction('garage')" class="btn-approve">Aprobar Garaje</button>
+                <button id="btn-approve-garage" class="btn-approve" onclick="approveAction('garage')">Aprobar Garaje</button>
             </div>
         </div>
     </div>
@@ -247,6 +247,9 @@
         async function login() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('error-msg');
+            errorDiv.innerText = "";
+            
             try {
                 const res = await fetch(`${API_BASE}/users/login`, {
                     method: 'POST',
@@ -255,10 +258,18 @@
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error);
+
+                // SEGURIDAD: Verificar que sea admin EN EL LOGIN
+                if (!data.user.es_admin) {
+                    throw new Error("Acceso Restringido: Esta cuenta no tiene permisos de administrador.");
+                }
+
                 localStorage.setItem('admin_token', data.token);
                 token = data.token;
                 showDashboard();
-            } catch (e) { alert(e.message); }
+            } catch (e) { 
+                errorDiv.innerText = e.message;
+            }
         }
 
         function logout() { localStorage.removeItem('admin_token'); location.reload(); }
@@ -298,6 +309,10 @@
                 });
             } catch (e) {
                 tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--error)">${e.message}</td></tr>`;
+                if (e.message.includes("administrador")) {
+                    alert("Tu sesión ha expirado o ya no tienes permisos.");
+                    logout();
+                }
             }
         }
 
@@ -335,6 +350,10 @@
                 document.getElementById('kyc-user-info').innerText = email;
                 document.getElementById('img-dni').src = data.documentos_temporales_5min.dni_frontal;
                 document.getElementById('img-selfie').src = data.documentos_temporales_5min.selfie;
+                
+                // Configurar botón aprobación
+                document.getElementById('btn-approve-user').onclick = () => approveAction('user');
+                
                 document.getElementById('modal-kyc').classList.remove('hidden');
             } catch (e) { alert(e.message); }
         }
