@@ -303,7 +303,7 @@
                 solicitudes.forEach(u => {
                     tbody.innerHTML += `<tr>
                         <td><b>${u.nombre_completo}</b><br><small>${u.correo}</small></td>
-                        <td>${new Date(u.createdAt).toLocaleDateString()}</td>
+                        <td>${new Date(u.fecha_creacion).toLocaleDateString()}</td>
                         <td><button onclick="openKYC('${u.id}', '${u.correo}')">Revisar</button></td>
                     </tr>`;
                 });
