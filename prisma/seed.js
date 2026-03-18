@@ -26,7 +26,7 @@ async function main() {
             password: adminPassword,
             nombre_completo: 'Administrador Sistema',
             es_admin: true,
-            esta_verificado: true
+            esta_verificado: "VERIFICADO"
         }
     });
 
@@ -38,7 +38,7 @@ async function main() {
             correo: 'juan@garaje.com',
             password: commonPassword,
             nombre_completo: 'Juan Pérez',
-            esta_verificado: true,
+            esta_verificado: "VERIFICADO",
             modo_actual: 'VENDEDOR'
         }
     });
@@ -51,7 +51,7 @@ async function main() {
             correo: 'maria@garaje.com',
             password: commonPassword,
             nombre_completo: 'Maria García',
-            esta_verificado: false,
+            esta_verificado: "PENDIENTE",
             dni_foto_url: 'kyc/dni_dummy.jpg',
             selfie_url: 'kyc/selfie_dummy.jpg',
             modo_actual: 'VENDEDOR'
@@ -66,7 +66,7 @@ async function main() {
             correo: 'pepe@garaje.com',
             password: commonPassword,
             nombre_completo: 'Pepe Cliente',
-            esta_verificado: false,
+            esta_verificado: "NO_VERIFICADO",
             modo_actual: 'ARRENDATARIO'
         }
     });
