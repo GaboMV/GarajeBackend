@@ -17,9 +17,8 @@ const {
 const { requireAuth, requireVerifiedKYC, requireAdmin } = require('../middlewares/auth.middleware');
 const upload = require('../middlewares/upload.middleware');
 
-// Todas estas rutas requieren estar autenticado y verificado
+// La gestión básica requiere estar autenticado
 router.use(requireAuth);
-router.use(requireVerifiedKYC);
 
 /**
  * @swagger
@@ -61,7 +60,7 @@ router.use(requireVerifiedKYC);
  *       201:
  *         description: Garaje creado exitosamente
  */
-router.post('/', createGaraje);
+router.post('/', requireVerifiedKYC, createGaraje);
 
 /**
  * @swagger
@@ -136,7 +135,7 @@ router.get('/:idGaraje', getGarageById);
  *       404:
  *         description: Garaje no encontrado
  */
-router.put('/:idGaraje', updateGarage);
+router.put('/:idGaraje', requireVerifiedKYC, updateGarage);
 
 /**
  * @swagger
@@ -157,7 +156,7 @@ router.put('/:idGaraje', updateGarage);
  *       200:
  *         description: Horario agregado exitosamente
  */
-router.post('/:idGaraje/horarios', addHorario);
+router.post('/:idGaraje/horarios', requireVerifiedKYC, addHorario);
 
 /**
  * @swagger
@@ -178,7 +177,7 @@ router.post('/:idGaraje/horarios', addHorario);
  *       200:
  *         description: Servicio adicional agregado exitosamente
  */
-router.post('/:idGaraje/servicios', addServicioAdicional);
+router.post('/:idGaraje/servicios', requireVerifiedKYC, addServicioAdicional);
 
 /**
  * @swagger
@@ -199,7 +198,7 @@ router.post('/:idGaraje/servicios', addServicioAdicional);
  *       200:
  *         description: Fecha bloqueada exitosamente
  */
-router.post('/:idGaraje/bloquear-fecha', blockDate);
+router.post('/:idGaraje/bloquear-fecha', requireVerifiedKYC, blockDate);
 
 /**
  * @swagger
@@ -231,7 +230,7 @@ router.post('/:idGaraje/bloquear-fecha', blockDate);
  *       200:
  *         description: Imagen subida exitosamente
  */
-router.post('/:idGaraje/imagenes', upload.single('imagen'), addImagen);
+router.post('/:idGaraje/imagenes', requireVerifiedKYC, upload.single('imagen'), addImagen);
 
 /**
  * @swagger

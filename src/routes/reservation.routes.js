@@ -4,9 +4,8 @@ const router = express.Router();
 const { createReservation, payReservation, getMyReservations, getOwnerReservations, getReservationById, approveReservation, rejectReservation } = require('../controllers/reservation.controller');
 const { requireAuth, requireVerifiedKYC } = require('../middlewares/auth.middleware');
 
-// La reserva requiere estar autenticado y verificado
+// La reserva requiere estar autenticado
 router.use(requireAuth);
-router.use(requireVerifiedKYC);
 
 /**
  * @swagger
@@ -73,7 +72,7 @@ router.get('/:idReserva', getReservationById);
  *       200:
  *         description: Reserva aprobada exitosamente
  */
-router.post('/:idReserva/approve', approveReservation);
+router.post('/:idReserva/approve', requireVerifiedKYC, approveReservation);
 
 /**
  * @swagger
@@ -87,7 +86,7 @@ router.post('/:idReserva/approve', approveReservation);
  *       200:
  *         description: Reserva rechazada/cancelada exitosamente
  */
-router.post('/:idReserva/reject', rejectReservation);
+router.post('/:idReserva/reject', requireVerifiedKYC, rejectReservation);
 
 /**
  * @swagger
@@ -145,7 +144,7 @@ router.post('/:idReserva/reject', rejectReservation);
  *       201:
  *         description: Reserva creada exitosamente con precio calculado y desglose de comisión
  */
-router.post('/', createReservation);
+router.post('/', requireVerifiedKYC, createReservation);
 
 /**
  * @swagger
