@@ -7,10 +7,9 @@ const prisma = require('../db/prisma');
 const searchGarajes = async (req, res, next) => {
     try {
         const { fecha, hora_inicio, hora_fin, lat, lng, radio_km } = req.query;
-
-        if (!fecha || !hora_inicio || !hora_fin) {
-            return res.status(400).json({ error: 'Faltan parámetros: fecha, hora_inicio, hora_fin' });
-        }
+        
+        // Los filtros de tiempo son opcionales para evitar error 400
+        const hasTimeFilters = fecha && hora_inicio && hora_fin;
 
         // Preparar filtro base
         let whereFiltro = {
@@ -35,12 +34,7 @@ const searchGarajes = async (req, res, next) => {
             whereFiltro.id = { in: idsCercanos };
         }
 
-        // Convertir strings a objetos manipulables
-        const searchDate = new Date(fecha);
-        const dayOfWeek = searchDate.getDay(); // 0 (Dom) a 6 (Sab)
-
-        // Traer todos los garajes que potencialmente sirvan (filtramos por IDs cercanos)
-        // Optimizamos trayendo sus horarios para filtrar día de la semana
+        // Traer todos los garajes que potencialmente sirvan
         const garajes = await prisma.garaje.findMany({
             where: whereFiltro,
             include: {
@@ -51,7 +45,6 @@ const searchGarajes = async (req, res, next) => {
                         fechas: true
                     },
                     where: {
-                        // Ignoramos las CANCELADAS y REEMBOLSADAS, las demás (ACEPTADA, PAGADA, etc) bloquean
                         estado: {
                             notIn: ['CANCELADA', 'REEMBOLSADA']
                         }
@@ -61,27 +54,24 @@ const searchGarajes = async (req, res, next) => {
             }
         });
 
-        // Aplicamos "La Matemática del Backend" (Filtro)
-        const garajesDisponibles = garajes.filter(garaje => {
-            // 1. ¿El garaje abre ese día de la semana?
+        // Aplicamos "La Matemática del Backend" (Filtro) SOLO SI hay parámetros de tiempo
+        const garajesDisponibles = hasTimeFilters ? garajes.filter(garaje => {
+            const searchDate = new Date(fecha);
+            const dayOfWeek = searchDate.getDay(); // 0 (Dom) a 6 (Sab)
+            
             const horarioHoy = garaje.horarios_semanales.find(h => h.dia_semana === dayOfWeek);
             if (!horarioHoy || !horarioHoy.abierto) return false;
 
-            // Revisar si está dentro de su rango de hora de apertura
             if (hora_inicio < horarioHoy.hora_inicio || hora_fin > horarioHoy.hora_fin) {
                 return false;
             }
 
-            // 2. ¿La fecha buscada está en la tabla de FechaBloqueada?
             const estaBloqueada = garaje.fechas_bloqueadas.some(fb =>
                 fb.fecha.toISOString().split('T')[0] === fecha
             );
             if (estaBloqueada) return false;
 
-            // 3. ¿El rango choca con los bloques de FechaReserva sumando tiempo de limpieza?
             let reservasSolapadas = 0;
-
-            // Función auxiliar para convertir "HH:mm" a minutos para facilitar matemáticas
             const timeToMinutes = (timeStr) => {
                 const [h, m] = timeStr.split(':').map(Number);
                 return (h * 60) + m;
@@ -91,15 +81,12 @@ const searchGarajes = async (req, res, next) => {
             const searchEndMin = timeToMinutes(hora_fin);
 
             garaje.reservas.forEach(reserva => {
-                // Verificar si esta reserva específica se solapa en la fecha pedida
                 let reservaChoca = false;
                 reserva.fechas.forEach(fr => {
                     if (fr.fecha.toISOString().split('T')[0] === fecha) {
                         const resStartMin = timeToMinutes(fr.hora_inicio);
-                        // El fin de la reserva existente se expande por el tiempo de limpieza necesario
                         const resEndMin = timeToMinutes(fr.hora_fin) + garaje.tiempo_limpieza;
 
-                        // Verificar Solapamiento:
                         if (searchStartMin < resEndMin && searchEndMin > resStartMin) {
                             reservaChoca = true;
                         }
@@ -111,11 +98,10 @@ const searchGarajes = async (req, res, next) => {
                 }
             });
 
-            // Si hay tantas o más reservas solapadas que la capacidad del garaje, no está disponible
             if (reservasSolapadas >= garaje.capacidad_puestos) return false;
 
             return true;
-        });
+        }) : garajes;
 
         // Limpiamos los datos innecesarios de las respuestas antes de mandarlas
         const responseData = garajesDisponibles.map(g => {
