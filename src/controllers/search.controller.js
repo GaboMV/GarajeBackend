@@ -6,19 +6,43 @@ const prisma = require('../db/prisma');
  */
 const searchGarajes = async (req, res, next) => {
     try {
-        const { fecha, hora_inicio, hora_fin } = req.query;
+        const { fecha, hora_inicio, hora_fin, lat, lng, radio_km } = req.query;
 
         if (!fecha || !hora_inicio || !hora_fin) {
             return res.status(400).json({ error: 'Faltan parámetros: fecha, hora_inicio, hora_fin' });
+        }
+
+        // Preparar filtro base
+        let whereFiltro = {
+            esta_aprobado: true // Solo buscar garajes aprobados por un admin
+        };
+
+        // Filtrado espacial usando PostGIS si hay coordenadas
+        if (lat && lng) {
+            const radio = radio_km ? parseFloat(radio_km) * 1000 : 5000; // Por defecto 5km (5000 metros)
+            
+            // Consultar IDs que están dentro del radio
+            const cercanosRaw = await prisma.$queryRaw`
+                SELECT id FROM "Garaje"
+                WHERE "ubicacion_geo" IS NOT NULL AND ST_DWithin(
+                    "ubicacion_geo", 
+                    ST_SetSRID(ST_MakePoint(${parseFloat(lng)}, ${parseFloat(lat)}), 4326)::geography, 
+                    ${radio}
+                )
+            `;
+            
+            const idsCercanos = cercanosRaw.map(g => g.id);
+            whereFiltro.id = { in: idsCercanos };
         }
 
         // Convertir strings a objetos manipulables
         const searchDate = new Date(fecha);
         const dayOfWeek = searchDate.getDay(); // 0 (Dom) a 6 (Sab)
 
-        // Traer todos los garajes que potencialmente sirvan (luego filtramos)
+        // Traer todos los garajes que potencialmente sirvan (filtramos por IDs cercanos)
         // Optimizamos trayendo sus horarios para filtrar día de la semana
         const garajes = await prisma.garaje.findMany({
+            where: whereFiltro,
             include: {
                 horarios_semanales: true,
                 fechas_bloqueadas: true,
