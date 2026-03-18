@@ -120,7 +120,7 @@ const getUserKyc = async (req, res, next) => {
 
         res.json({
             usuario: user.correo,
-            estado: user.esta_verificado ? 'Aprobado' : 'Pendiente',
+            estado: user.esta_verificado === "VERIFICADO" ? 'Aprobado' : 'Pendiente',
             documentos_temporales_5min: {
                 dni_frontal: dniUrl,
                 selfie: selfieUrl
@@ -144,7 +144,7 @@ const approveUser = async (req, res, next) => {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
 
-        if (user.esta_verificado) {
+        if (user.esta_verificado === "VERIFICADO") {
             return res.status(400).json({ error: 'El usuario ya está verificado' });
         }
 
