@@ -202,49 +202,54 @@ const login = async (req, res, next) => {
     }
 }
 
+const fetch = require('node-fetch');
+
 /**
  * Google Sign-In / Social Auth
- * El cliente (Flutter/React Native) usa Firebase Auth SDK con Google.
- * Tras autenticar al usuario, Firebase devuelve un "idToken".
- * Este endpoint recibe ese idToken, lo verifica y devuelve nuestro JWT propio.
- *
- * Flujo:
- *   1. App → Google → Firebase idToken
- *   2. App → POST /api/users/auth/google { idToken }
- *   3. Backend verifica idToken con Firebase Admin SDK
- *   4. Backend busca o crea el Usuario local
- *   5. Backend devuelve { token, user } con nuestro JWT
+ * El cliente (Flutter) puede enviar 'idToken' (Mobile) o 'accessToken' (Web).
  */
 const googleSignIn = async (req, res, next) => {
     try {
-        const { idToken } = req.body;
+        const { idToken, accessToken } = req.body;
 
-        if (!idToken) {
-            return res.status(400).json({ error: 'idToken de Google es requerido' });
+        if (!idToken && !accessToken) {
+            return res.status(400).json({ error: 'Se requiere idToken o accessToken de Google' });
         }
 
-        const clientIDs = process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.split(',').map(id => id.trim()) : [];
-        
-        if (clientIDs.length === 0) {
-            return res.status(501).json({
-                error: 'Google Sign-In no configurado en el servidor.',
-                instrucciones: 'Configura GOOGLE_CLIENT_ID en el archivo .env (puedes poner varios separados por coma).'
+        let email, name, google_uid;
+
+        if (idToken) {
+            // Flujo Mobile (ID Token)
+            const clientIDs = process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.split(',').map(id => id.trim()) : [];
+            const client = new OAuth2Client();
+            
+            const ticket = await client.verifyIdToken({
+                idToken: idToken,
+                audience: clientIDs,
             });
+
+            const payload = ticket.getPayload();
+            email = payload.email;
+            name = payload.name;
+            google_uid = payload.sub;
+        } else {
+            // Flujo Web (Access Token)
+            const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            });
+
+            if (!response.ok) {
+                throw new Error('No se pudo validar el accessToken con Google');
+            }
+
+            const data = await response.json();
+            email = data.email;
+            name = data.name;
+            google_uid = data.sub;
         }
-
-        const client = new OAuth2Client(); // No pasamos ID aquí si usaremos varios en verifyIdToken
-
-        // Verificar el idToken con Google Auth Library
-        const ticket = await client.verifyIdToken({
-            idToken: idToken,
-            audience: clientIDs, // google-auth-library acepta un array de IDs
-        });
-
-        const payload = ticket.getPayload();
-        const { email, name, sub: google_uid } = payload;
 
         if (!email) {
-            return res.status(400).json({ error: 'El token de Google no contiene un correo electrónico.' });
+            return res.status(400).json({ error: 'El perfil de Google no contiene un correo electrónico.' });
         }
 
         // Buscar usuario existente o crear uno nuevo
@@ -254,10 +259,10 @@ const googleSignIn = async (req, res, next) => {
             user = await prisma.usuario.create({
                 data: {
                     correo: email,
-                    password: `google_oauth_${google_uid}`, // contraseña placeholder
+                    password: `google_oauth_${google_uid}`,
                     nombre_completo: name || null,
                     esta_verificado: false,
-                    modo_actual: 'VENDEDOR' // Valor por defecto
+                    modo_actual: 'VENDEDOR'
                 }
             });
         }
@@ -267,7 +272,7 @@ const googleSignIn = async (req, res, next) => {
         });
 
         res.json({
-            message: user.createdAt === user.updatedAt ? 'Cuenta creada con Google.' : 'Login con Google exitoso.',
+            message: 'Login con Google exitoso.',
             token,
             user: {
                 id: user.id,
@@ -279,7 +284,7 @@ const googleSignIn = async (req, res, next) => {
         });
     } catch (error) {
         console.error('Error en Google Auth:', error);
-        return res.status(401).json({ error: 'Token de Google inválido o expirado.' });
+        return res.status(401).json({ error: 'Token de Google inválido, expirado o error al obtener perfil.' });
     }
 };
 
