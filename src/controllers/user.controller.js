@@ -294,6 +294,7 @@ const googleSignIn = async (req, res, next) => {
  */
 const getPendingKycUsers = async (req, res, next) => {
     try {
+        console.log("Admin Request: getPendingKycUsers initiate");
         const users = await prisma.usuario.findMany({
             where: {
                 esta_verificado: false,
@@ -310,11 +311,13 @@ const getPendingKycUsers = async (req, res, next) => {
             }
         });
 
+        console.log(`Admin Request: found ${users.length} pending users`);
         res.json({
             count: users.length,
             solicitudes: users
         });
     } catch (error) {
+        console.error("CRITICAL ERROR in getPendingKycUsers:", error);
         next(error);
     }
 }
