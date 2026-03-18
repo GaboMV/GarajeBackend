@@ -194,7 +194,8 @@ const login = async (req, res, next) => {
                 correo: user.correo,
                 nombre_completo: user.nombre_completo,
                 esta_verificado: user.esta_verificado,
-                modo_actual: user.modo_actual
+                modo_actual: user.modo_actual,
+                es_admin: user.es_admin
             }
         });
     } catch (error) {
@@ -279,7 +280,8 @@ const googleSignIn = async (req, res, next) => {
                 correo: user.correo,
                 nombre_completo: user.nombre_completo,
                 esta_verificado: user.esta_verificado,
-                modo_actual: user.modo_actual
+                modo_actual: user.modo_actual,
+                es_admin: user.es_admin
             }
         });
     } catch (error) {
