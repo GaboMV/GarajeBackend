@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Garajes App</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+            --error: #ef4444;
+            --success: #22c55e;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Outfit', sans-serif; }
+
+        body {
+            background-color: var(--bg);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(236, 72, 153, 0.1) 0%, transparent 40%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .hidden { display: none !important; }
+
+        .container {
+            width: 100%;
+            max-width: 1100px;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 25px;
+            text-align: center;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+            color: var(--text-dim);
+            font-weight: 600;
+        }
+
+        .tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .tab:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Forms / Inputs */
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            margin-top: 5px;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: var(--primary);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
+        }
+
+        button.secondary { background: rgba(255, 255, 255, 0.1); }
+        button.btn-approve { background: var(--success); }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { text-align: left; padding: 16px; color: var(--text-dim); font-weight: 400; border-bottom: 1px solid var(--border); }
+        td { padding: 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px);
+            display: flex; align-items: center; justify-content: center; z-index: 1000;
+        }
+
+        .modal {
+            background: #1e293b; padding: 30px; border-radius: 20px;
+            max-width: 90%; width: 850px; max-height: 90vh; overflow-y: auto;
+        }
+
+        .image-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .image-card { text-align: center; }
+        .image-card label { display: block; margin-bottom: 5px; font-size: 0.8rem; color: var(--text-dim); }
+        .image-card img { width: 100%; border-radius: 12px; border: 1px solid var(--border); cursor: pointer; }
+        .image-card img:hover { border-color: var(--primary); }
+
+        .legal-doc-box {
+            background: rgba(99, 102, 241, 0.05);
+            border: 1px dashed var(--primary);
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        #error-msg { color: var(--error); text-align: center; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN -->
+    <div class="container" id="login-container" style="max-width: 450px;">
+        <h1>Admin Console</h1>
+        <div id="error-msg"></div>
+        <input type="email" id="email" placeholder="admin@garajes.com" style="margin-bottom: 15px;">
+        <input type="password" id="password" placeholder="Contraseña" style="margin-bottom: 20px;">
+        <button onclick="login()" style="width: 100%;">Entrar</button>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="container hidden" id="dashboard-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <h1 style="margin: 0;">Admin Dashboard</h1>
+            <button onclick="logout()" class="secondary">Salir</button>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" id="tab-kyc" onclick="switchTab('kyc')">Verificación de Usuarios (KYC)</div>
+            <div class="tab" id="tab-garages" onclick="switchTab('garages')">Garajes Pendientes</div>
+        </div>
+
+        <!-- Sección KYC -->
+        <div id="section-kyc">
+            <table>
+                <thead>
+                    <tr><th>Usuario</th><th>Fecha</th><th>Acción</th></tr>
+                </thead>
+                <tbody id="kyc-table-body"></tbody>
+            </table>
+        </div>
+
+        <!-- Sección Garajes -->
+        <div id="section-garages" class="hidden">
+            <table>
+                <thead>
+                    <tr><th>Garaje / Dueño</th><th>Ubicación</th><th>Acción</th></tr>
+                </thead>
+                <tbody id="garage-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- MODAL KYC -->
+    <div class="modal-overlay hidden" id="modal-kyc">
+        <div class="modal">
+            <h2>Revisar KYC</h2>
+            <p id="kyc-user-info" style="color: var(--text-dim); margin-top: 5px;"></p>
+            <div class="image-grid">
+                <div class="image-card"><label>DNI / Documento</label><img id="img-dni" onclick="window.open(this.src)"></div>
+                <div class="image-card"><label>Selfie de Validación</label><img id="img-selfie" onclick="window.open(this.src)"></div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button onclick="closeModals()" class="secondary">Cerrar</button>
+                <button onclick="approveAction('user')" class="btn-approve">Aprobar Usuario</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL GARAJE -->
+    <div class="modal-overlay hidden" id="modal-garage">
+        <div class="modal">
+            <h2 id="garage-title">Detalles del Garaje</h2>
+            <p id="garage-owner" style="color: var(--text-dim);"></p>
+            
+            <div id="garage-legal-doc" class="legal-doc-box">
+                <h4 style="color: var(--primary); margin-bottom: 10px;">📄 Documento de Propiedad (Privado)</h4>
+                <div id="legal-doc-content">Cargando...</div>
+            </div>
+
+            <p id="garage-desc" style="margin: 15px 0;"></p>
+            <label style="color: var(--text-dim); font-size: 0.9rem;">Fotos del Establecimiento (Públicas):</label>
+            <div class="image-grid" id="garage-images"></div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button onclick="closeModals()" class="secondary">Cerrar</button>
+                <button onclick="approveAction('garage')" class="btn-approve">Aprobar Garaje</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin.includes('localhost') 
+            ? 'http://localhost:3000/api' 
+            : 'https://garaje-backend-api.onrender.com/api';
+
+        let token = localStorage.getItem('admin_token');
+        let currentId = null;
+        let pendingGaragesList = [];
+
+        if (token) showDashboard();
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            try {
+                const res = await fetch(`${API_BASE}/users/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ correo: email, password })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+                localStorage.setItem('admin_token', data.token);
+                token = data.token;
+                showDashboard();
+            } catch (e) { alert(e.message); }
+        }
+
+        function logout() { localStorage.removeItem('admin_token'); location.reload(); }
+
+        function showDashboard() {
+            document.getElementById('login-container').classList.add('hidden');
+            document.getElementById('dashboard-container').classList.remove('hidden');
+            loadKYC();
+        }
+
+        function switchTab(type) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${type}`).classList.add('active');
+            document.getElementById('section-kyc').classList.toggle('hidden', type !== 'kyc');
+            document.getElementById('section-garages').classList.toggle('hidden', type !== 'garages');
+            type === 'kyc' ? loadKYC() : loadGarages();
+        }
+
+        async function loadKYC() {
+            const res = await fetch(`${API_BASE}/users/kyc/pending`, { headers: { Authorization: `Bearer ${token}` } });
+            const data = await res.json();
+            const tbody = document.getElementById('kyc-table-body');
+            tbody.innerHTML = data.solicitudes.length ? '' : '<tr><td colspan="3" style="text-align:center">Sin pendientes</td></tr>';
+            data.solicitudes.forEach(u => {
+                tbody.innerHTML += `<tr>
+                    <td><b>${u.nombre_completo}</b><br><small>${u.correo}</small></td>
+                    <td>${new Date(u.createdAt).toLocaleDateString()}</td>
+                    <td><button onclick="openKYC('${u.id}', '${u.correo}')">Revisar</button></td>
+                </tr>`;
+            });
+        }
+
+        async function loadGarages() {
+            const res = await fetch(`${API_BASE}/garages/admin/pending`, { headers: { Authorization: `Bearer ${token}` } });
+            const data = await res.json();
+            pendingGaragesList = data.garages || [];
+            const tbody = document.getElementById('garage-table-body');
+            tbody.innerHTML = pendingGaragesList.length ? '' : '<tr><td colspan="3" style="text-align:center">Sin pendientes</td></tr>';
+            pendingGaragesList.forEach(g => {
+                tbody.innerHTML += `<tr>
+                    <td><b>${g.nombre}</b><br><small>Dueño: ${g.dueno?.nombre_completo}</small></td>
+                    <td>${g.direccion || 'S/D'}</td>
+                    <td><button onclick="openGarage('${g.id}')">Ver Detalle</button></td>
+                </tr>`;
+            });
+        }
+
+        async function openKYC(id, email) {
+            currentId = id;
+            const res = await fetch(`${API_BASE}/users/kyc/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+            const data = await res.json();
+            document.getElementById('kyc-user-info').innerText = email;
+            document.getElementById('img-dni').src = data.documentos_temporales_5min.dni_frontal;
+            document.getElementById('img-selfie').src = data.documentos_temporales_5min.selfie;
+            document.getElementById('modal-kyc').classList.remove('hidden');
+        }
+
+        async function openGarage(id) {
+            currentId = id;
+            const garage = pendingGaragesList.find(g => g.id === id);
+            if (!garage) return;
+            
+            document.getElementById('garage-title').innerText = garage.nombre;
+            document.getElementById('garage-owner').innerText = `Dueño: ${garage.dueno.nombre_completo} (${garage.dueno.correo})`;
+            document.getElementById('garage-desc').innerText = garage.descripcion || 'Sin descripción';
+            
+            // Documento de Propiedad (desde la URL pre-firmada enviada por el backend)
+            const legalContent = document.getElementById('legal-doc-content');
+            if (garage.documento_propiedad_presigned) {
+                legalContent.innerHTML = `<img src="${garage.documento_propiedad_presigned}" style="max-width:300px; border-radius:8px;" onclick="window.open(this.src)">
+                    <p style="font-size:0.8rem; margin-top:5px;">Click para ampliar</p>`;
+            } else {
+                legalContent.innerHTML = `<p style="color:var(--error)">No se adjuntó documento de propiedad</p>`;
+            }
+
+            document.getElementById('garage-images').innerHTML = garage.imagenes.map(i => `<div class="image-card"><img src="${i.url}" onclick="window.open(this.src)"></div>`).join('');
+            document.getElementById('modal-garage').classList.remove('hidden');
+        }
+
+        async function approveAction(type) {
+            const url = type === 'user' ? `${API_BASE}/users/approve/${currentId}` : `${API_BASE}/garages/admin/approve/${currentId}`;
+            const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+            if (res.ok) {
+                alert('Aprobado con éxito');
+                closeModals();
+                type === 'user' ? loadKYC() : loadGarages();
+            } else alert('Error al aprobar');
+        }
+
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden')); }
+    </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { createReservation, payReservation, getMyReservations, getOwnerReservations, getReservationById } = require('../controllers/reservation.controller');
+const { createReservation, payReservation, getMyReservations, getOwnerReservations, getReservationById, approveReservation, rejectReservation } = require('../controllers/reservation.controller');
 const { requireAuth, requireVerifiedKYC } = require('../middlewares/auth.middleware');
 
 // La reserva requiere estar autenticado y verificado
@@ -60,6 +60,34 @@ router.get('/owner', getOwnerReservations);
  *         description: Reserva no encontrada
  */
 router.get('/:idReserva', getReservationById);
+
+/**
+ * @swagger
+ * /api/reservations/{idReserva}/approve:
+ *   post:
+ *     summary: Aprobar una solicitud de reserva (solo el dueño del garaje)
+ *     tags: [Reservas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Reserva aprobada exitosamente
+ */
+router.post('/:idReserva/approve', approveReservation);
+
+/**
+ * @swagger
+ * /api/reservations/{idReserva}/reject:
+ *   post:
+ *     summary: Rechazar o cancelar una solicitud de reserva
+ *     tags: [Reservas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Reserva rechazada/cancelada exitosamente
+ */
+router.post('/:idReserva/reject', rejectReservation);
 
 /**
  * @swagger

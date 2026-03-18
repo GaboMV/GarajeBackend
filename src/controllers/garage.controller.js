@@ -1,5 +1,5 @@
 const prisma = require('../db/prisma');
-const { uploadFilePublic } = require('../services/upload.service');
+const { uploadFilePublic, uploadFilePrivate, getDynamicPresignedUrl } = require('../services/upload.service');
 
 /**
  * 1. Crear un nuevo Garaje
@@ -282,6 +282,80 @@ const updateGarage = async (req, res, next) => {
     }
 }
 
+/**
+ * Admin: List pending garages
+ */
+const getPendingGarages = async (req, res, next) => {
+    try {
+        const garages = await prisma.garaje.findMany({
+            where: { esta_aprobado: false },
+            include: {
+                dueno: { select: { nombre_completo: true, correo: true } },
+                imagenes: true
+            }
+        });
+
+        // Generar URLs temporales para los documentos de propiedad
+        const garagesWithUrls = await Promise.all(garages.map(async (g) => {
+            const docUrl = g.documento_propiedad_url 
+                ? await getDynamicPresignedUrl(g.documento_propiedad_url)
+                : null;
+            return { ...g, documento_propiedad_presigned: docUrl };
+        }));
+
+        res.json({ count: garagesWithUrls.length, garages: garagesWithUrls });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * Admin: Approve Garage
+ */
+const approveGarage = async (req, res, next) => {
+    try {
+        const { idGaraje } = req.params;
+        const garage = await prisma.garaje.update({
+            where: { id: idGaraje },
+            data: { esta_aprobado: true }
+        });
+        res.json({ message: 'Garaje aprobado exitosamente', garage });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * 8. Subir Documento de Propiedad (Bucket PRIVADO)
+ */
+const uploadPropertyDoc = async (req, res, next) => {
+    try {
+        const id_dueno = req.user.id;
+        const { idGaraje } = req.params;
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subió ningún archivo' });
+        }
+
+        const garaje = await prisma.garaje.findUnique({ where: { id: idGaraje } });
+        if (!garaje || garaje.id_dueno !== id_dueno) {
+            return res.status(403).json({ error: 'No tienes permisos sobre este garaje' });
+        }
+
+        // Subir al bucket PRIVADO (igual que el KYC) y guardar solo la KEY
+        const key = await uploadFilePrivate(req.file, 'garajes-docs');
+
+        await prisma.garaje.update({
+            where: { id: idGaraje },
+            data: { documento_propiedad_url: key }
+        });
+
+        res.json({ message: 'Documento de propiedad subido con éxito. El admin lo revisará.', key });
+    } catch (error) {
+        next(error);
+    }
+}
+
 module.exports = {
     createGaraje,
     addHorario,
@@ -290,5 +364,8 @@ module.exports = {
     addImagen,
     getMyGarages,
     getGarageById,
-    updateGarage
+    updateGarage,
+    getPendingGarages,
+    approveGarage,
+    uploadPropertyDoc
 };

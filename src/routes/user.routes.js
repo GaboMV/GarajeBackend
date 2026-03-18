@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { register, login, approveUser, uploadKyc, getUserKyc, googleSignIn, getUserProfile } = require('../controllers/user.controller');
+const { register, login, approveUser, uploadKyc, getUserKyc, googleSignIn, getUserProfile, getPendingKycUsers } = require('../controllers/user.controller');
 const { requireAuth, requireAdmin } = require('../middlewares/auth.middleware');
 const upload = require('../middlewares/upload.middleware');
 
@@ -154,6 +154,20 @@ router.get('/profile', requireAuth, getUserProfile);
 router.post('/kyc', requireAuth, upload.fields([{ name: 'dni_foto', maxCount: 1 }, { name: 'selfie', maxCount: 1 }]), uploadKyc);
 
 // Rutas de administrador (requieren privilegios de admin)
+/**
+ * @swagger
+ * /api/users/kyc/pending:
+ *   get:
+ *     summary: Listar todas las solicitudes KYC pendientes (solo admin)
+ *     tags: [Usuarios]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de usuarios pendientes de verificación
+ */
+router.get('/kyc/pending', requireAdmin, getPendingKycUsers);
+
 /**
  * @swagger
  * /api/users/kyc/{idUsuario}:

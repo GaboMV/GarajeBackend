@@ -289,6 +289,37 @@ const googleSignIn = async (req, res, next) => {
 };
 
 /**
+ * Admin: List users with pending KYC
+ * Busca usuarios que no están verificados pero que tienen documentos subidos.
+ */
+const getPendingKycUsers = async (req, res, next) => {
+    try {
+        const users = await prisma.usuario.findMany({
+            where: {
+                esta_verificado: false,
+                dni_foto_url: { not: null },
+                selfie_url: { not: null }
+            },
+            select: {
+                id: true,
+                correo: true,
+                nombre_completo: true,
+                createdAt: true,
+                dni_foto_url: true,
+                selfie_url: true
+            }
+        });
+
+        res.json({
+            count: users.length,
+            solicitudes: users
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
  * User Profile
  * Usado para refrescar los datos del usuario en el frontend
  */
@@ -326,5 +357,6 @@ module.exports = {
     approveUser,
     login,
     googleSignIn,
-    getUserProfile
+    getUserProfile,
+    getPendingKycUsers
 };
