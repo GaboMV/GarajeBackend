@@ -38,6 +38,15 @@ const createGaraje = async (req, res, next) => {
             }
         });
 
+        // Insertar el punto geográfico en PostGIS
+        if (latitud && longitud) {
+            await prisma.$executeRaw`
+                UPDATE "Garaje" 
+                SET ubicacion_geo = ST_SetSRID(ST_MakePoint(${parseFloat(longitud)}, ${parseFloat(latitud)}), 4326) 
+                WHERE id = ${nuevoGaraje.id}
+            `;
+        }
+
         res.status(201).json({
             message: 'Garaje creado exitosamente',
             garaje: nuevoGaraje
@@ -275,6 +284,15 @@ const updateGarage = async (req, res, next) => {
                 tiene_mesa: tiene_mesa !== undefined ? tiene_mesa : garajeExistente.tiene_mesa,
             }
         });
+
+        // Actualizar el punto geográfico en PostGIS si se enviaron nuevas coordenadas
+        if (latitud !== undefined && longitud !== undefined) {
+            await prisma.$executeRaw`
+                UPDATE "Garaje" 
+                SET ubicacion_geo = ST_SetSRID(ST_MakePoint(${parseFloat(longitud)}, ${parseFloat(latitud)}), 4326) 
+                WHERE id = ${idGaraje}
+            `;
+        }
 
         res.json({ message: 'Garaje actualizado exitosamente', garaje: garajeActualizado });
     } catch (error) {
