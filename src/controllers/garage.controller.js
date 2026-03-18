@@ -311,15 +311,43 @@ const getPendingGarages = async (req, res, next) => {
 
 /**
  * Admin: Approve Garage
+ * Valida que el dueño esté verificado y que existan documentos/fotos.
  */
 const approveGarage = async (req, res, next) => {
     try {
         const { idGaraje } = req.params;
-        const garage = await prisma.garaje.update({
+
+        const garage = await prisma.garaje.findUnique({
+            where: { id: idGaraje },
+            include: { dueno: true, imagenes: true }
+        });
+
+        if (!garage) {
+            return res.status(404).json({ error: 'Garaje no encontrado' });
+        }
+
+        // REGLAS DE NEGOCIO:
+        // 1. El dueño debe estar verificado (KYC)
+        if (!garage.dueno.esta_verificado) {
+            return res.status(400).json({ error: 'El dueño no está verificado (KYC pendiente). No se puede aprobar el garaje.' });
+        }
+
+        // 2. Debe tener documento de propiedad subido
+        if (!garage.documento_propiedad_url) {
+            return res.status(400).json({ error: 'Falta el documento de propiedad para validar la legitimidad.' });
+        }
+
+        // 3. Debe tener al menos una foto pública
+        if (garage.imagenes.length === 0) {
+            return res.status(400).json({ error: 'El garaje no tiene fotos del establecimiento para mostrar al cliente.' });
+        }
+
+        const approvedGarage = await prisma.garaje.update({
             where: { id: idGaraje },
             data: { esta_aprobado: true }
         });
-        res.json({ message: 'Garaje aprobado exitosamente', garage });
+
+        res.json({ message: 'Garaje aprobado con éxito', garage: approvedGarage });
     } catch (error) {
         next(error);
     }
