@@ -278,42 +278,65 @@
         }
 
         async function loadKYC() {
-            const res = await fetch(`${API_BASE}/users/kyc/pending`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
             const tbody = document.getElementById('kyc-table-body');
-            tbody.innerHTML = data.solicitudes.length ? '' : '<tr><td colspan="3" style="text-align:center">Sin pendientes</td></tr>';
-            data.solicitudes.forEach(u => {
-                tbody.innerHTML += `<tr>
-                    <td><b>${u.nombre_completo}</b><br><small>${u.correo}</small></td>
-                    <td>${new Date(u.createdAt).toLocaleDateString()}</td>
-                    <td><button onclick="openKYC('${u.id}', '${u.correo}')">Revisar</button></td>
-                </tr>`;
-            });
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Cargando...</td></tr>';
+            
+            try {
+                const res = await fetch(`${API_BASE}/users/kyc/pending`, { headers: { Authorization: `Bearer ${token}` } });
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.error || "Error al cargar KYC");
+
+                const solicitudes = data.solicitudes || [];
+                tbody.innerHTML = solicitudes.length ? '' : '<tr><td colspan="3" style="text-align:center">Sin pendientes</td></tr>';
+                solicitudes.forEach(u => {
+                    tbody.innerHTML += `<tr>
+                        <td><b>${u.nombre_completo}</b><br><small>${u.correo}</small></td>
+                        <td>${new Date(u.createdAt).toLocaleDateString()}</td>
+                        <td><button onclick="openKYC('${u.id}', '${u.correo}')">Revisar</button></td>
+                    </tr>`;
+                });
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--error)">${e.message}</td></tr>`;
+            }
         }
 
         async function loadGarages() {
-            const res = await fetch(`${API_BASE}/garages/admin/pending`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            pendingGaragesList = data.garages || [];
             const tbody = document.getElementById('garage-table-body');
-            tbody.innerHTML = pendingGaragesList.length ? '' : '<tr><td colspan="3" style="text-align:center">Sin pendientes</td></tr>';
-            pendingGaragesList.forEach(g => {
-                tbody.innerHTML += `<tr>
-                    <td><b>${g.nombre}</b><br><small>Dueño: ${g.dueno?.nombre_completo}</small></td>
-                    <td>${g.direccion || 'S/D'}</td>
-                    <td><button onclick="openGarage('${g.id}')">Ver Detalle</button></td>
-                </tr>`;
-            });
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center">Cargando...</td></tr>';
+
+            try {
+                const res = await fetch(`${API_BASE}/garages/admin/pending`, { headers: { Authorization: `Bearer ${token}` } });
+                const data = await res.json();
+
+                if (!res.ok) throw new Error(data.error || "Error al cargar garajes");
+
+                pendingGaragesList = data.garages || [];
+                tbody.innerHTML = pendingGaragesList.length ? '' : '<tr><td colspan="3" style="text-align:center">Sin pendientes</td></tr>';
+                pendingGaragesList.forEach(g => {
+                    tbody.innerHTML += `<tr>
+                        <td><b>${g.nombre}</b><br><small>Dueño: ${g.dueno?.nombre_completo}</small></td>
+                        <td>${g.direccion || 'S/D'}</td>
+                        <td><button onclick="openGarage('${g.id}')">Ver Detalle</button></td>
+                    </tr>`;
+                });
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--error)">${e.message}</td></tr>`;
+            }
         }
 
         async function openKYC(id, email) {
             currentId = id;
-            const res = await fetch(`${API_BASE}/users/kyc/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            document.getElementById('kyc-user-info').innerText = email;
-            document.getElementById('img-dni').src = data.documentos_temporales_5min.dni_frontal;
-            document.getElementById('img-selfie').src = data.documentos_temporales_5min.selfie;
-            document.getElementById('modal-kyc').classList.remove('hidden');
+            try {
+                const res = await fetch(`${API_BASE}/users/kyc/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+
+                document.getElementById('kyc-user-info').innerText = email;
+                document.getElementById('img-dni').src = data.documentos_temporales_5min.dni_frontal;
+                document.getElementById('img-selfie').src = data.documentos_temporales_5min.selfie;
+                document.getElementById('modal-kyc').classList.remove('hidden');
+            } catch (e) { alert(e.message); }
         }
 
         async function openGarage(id) {
@@ -325,7 +348,6 @@
             document.getElementById('garage-owner').innerText = `Dueño: ${garage.dueno.nombre_completo} (${garage.dueno.correo})`;
             document.getElementById('garage-desc').innerText = garage.descripcion || 'Sin descripción';
             
-            // Documento de Propiedad (desde la URL pre-firmada enviada por el backend)
             const legalContent = document.getElementById('legal-doc-content');
             if (garage.documento_propiedad_presigned) {
                 legalContent.innerHTML = `<img src="${garage.documento_propiedad_presigned}" style="max-width:300px; border-radius:8px;" onclick="window.open(this.src)">
@@ -340,12 +362,15 @@
 
         async function approveAction(type) {
             const url = type === 'user' ? `${API_BASE}/users/approve/${currentId}` : `${API_BASE}/garages/admin/approve/${currentId}`;
-            const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-            if (res.ok) {
+            try {
+                const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+
                 alert('Aprobado con éxito');
                 closeModals();
                 type === 'user' ? loadKYC() : loadGarages();
-            } else alert('Error al aprobar');
+            } catch (e) { alert('Error al aprobar: ' + e.message); }
         }
 
         function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden')); }
