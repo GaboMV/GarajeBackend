@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const { errorMiddleware } = require('./middlewares/error.middleware');
 
 const app = express();
+app.set('trust proxy', 1); // Confía en el proxy de Render para el Rate Limit
 
 const userRoutes = require('./routes/user.routes');
 const garageRoutes = require('./routes/garage.routes');
