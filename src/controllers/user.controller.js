@@ -35,7 +35,8 @@ const register = async (req, res, next) => {
                 correo,
                 password: hashedPassword,
                 nombre_completo: nombre_completo || null,
-                esta_verificado: "NO_VERIFICADO" // Nace sin subir nada
+                esta_verificado: "NO_VERIFICADO", // Nace sin subir nada
+                modo_actual: "VENDEDOR"
             }
         });
 
