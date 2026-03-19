@@ -17,6 +17,7 @@ model Usuario {
   correo              String    @unique
   password            String
   nombre_completo     String?
+  telefono            String?
   dni_foto_url        String?
   selfie_url          String?
   esta_verificado     String    @default("NO_VERIFICADO") // NO_VERIFICADO, PENDIENTE, RECHAZADO, VERIFICADO

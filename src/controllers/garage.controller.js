@@ -19,24 +19,47 @@ const createGaraje = async (req, res, next) => {
             return res.status(400).json({ error: 'Nombre y al menos un precio (hora o dia) son obligatorios' });
         }
 
+        // Subir documento de propiedad al bucket PRIVADO (si existe)
+        let documentoPropiedadUrl = null;
+        if (req.files && req.files['documento'] && req.files['documento'].length > 0) {
+            documentoPropiedadUrl = await uploadFilePrivate(req.files['documento'][0], 'propiedades');
+        }
+
         const nuevoGaraje = await prisma.garaje.create({
             data: {
                 id_dueno,
                 nombre,
                 descripcion,
                 direccion,
-                latitud,
-                longitud,
-                precio_hora,
-                precio_dia,
-                minimo_horas: minimo_horas || 1,
-                tiempo_limpieza: tiempo_limpieza || 0,
-                tiene_wifi: tiene_wifi || false,
-                tiene_bano: tiene_bano || false,
-                tiene_electricidad: tiene_electricidad || false,
-                tiene_mesa: tiene_mesa || false,
+                latitud: latitud ? parseFloat(latitud) : null,
+                longitud: longitud ? parseFloat(longitud) : null,
+                precio_hora: precio_hora ? parseFloat(precio_hora) : null,
+                precio_dia: precio_dia ? parseFloat(precio_dia) : null,
+                minimo_horas: minimo_horas ? parseInt(minimo_horas) : 1,
+                tiempo_limpieza: tiempo_limpieza ? parseInt(tiempo_limpieza) : 0,
+                tiene_wifi: tiene_wifi === 'true' || tiene_wifi === true,
+                tiene_bano: tiene_bano === 'true' || tiene_bano === true,
+                tiene_electricidad: tiene_electricidad === 'true' || tiene_electricidad === true,
+                tiene_mesa: tiene_mesa === 'true' || tiene_mesa === true,
+                esta_aprobado: false, // Siempre requiere aprobación inicial
+                documento_propiedad_url: documentoPropiedadUrl,
             }
         });
+
+        // Procesar imágenes adicionales del garaje (Bucket PÚBLICO)
+        if (req.files && req.files['imagenes'] && req.files['imagenes'].length > 0) {
+            const uploadPromises = req.files['imagenes'].map(file => uploadFilePublic(file, 'garajes'));
+            const uploadedImageUrls = await Promise.all(uploadPromises);
+
+            const imagenesData = uploadedImageUrls.map(url => ({
+                id_garaje: nuevoGaraje.id,
+                url
+            }));
+
+            await prisma.imagenGaraje.createMany({
+                data: imagenesData
+            });
+        }
 
         // Insertar el punto geográfico en PostGIS
         if (latitud && longitud) {
@@ -368,6 +391,15 @@ const approveGarage = async (req, res, next) => {
             where: { id: idGaraje },
             data: { esta_aprobado: true }
         });
+
+        // Emitimos notificación por WebSocket al dueño del garaje
+        const io = req.app.get('socketio');
+        if (io && garage.id_dueno) {
+            io.to(garage.id_dueno).emit('garage_approved', {
+                message: '¡Tu espacio ha sido aprobado y ya está visible para reservas!',
+                garageId: idGaraje
+            });
+        }
 
         res.json({ message: 'Garaje aprobado con éxito', garage: approvedGarage });
     } catch (error) {
