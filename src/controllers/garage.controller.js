@@ -15,14 +15,26 @@ const createGaraje = async (req, res, next) => {
             tiene_wifi, tiene_bano, tiene_electricidad, tiene_mesa
         } = req.body;
 
+        // Capturar coordenadas de varias posibles fuentes (latitud/longitud o lat/lng)
+        const lat = latitud || req.body.lat;
+        const lng = longitud || req.body.lng;
+
         if (!nombre || (!precio_hora && !precio_dia)) {
             return res.status(400).json({ error: 'Nombre y al menos un precio (hora o dia) son obligatorios' });
         }
 
+        console.log("Creando garaje - Files received:", req.files ? Object.keys(req.files) : "none");
+        console.log("Creando garaje - Body:", req.body);
+
         // Subir documento de propiedad al bucket PRIVADO (si existe)
         let documentoPropiedadUrl = null;
         if (req.files && req.files['documento'] && req.files['documento'].length > 0) {
-            documentoPropiedadUrl = await uploadFilePrivate(req.files['documento'][0], 'propiedades');
+            console.log("Subiendo documento de propiedad...");
+            // Usamos 'garajes-docs' para ser consistentes con uploadPropertyDoc
+            documentoPropiedadUrl = await uploadFilePrivate(req.files['documento'][0], 'garajes-docs');
+            console.log("Documento subido. Key:", documentoPropiedadUrl);
+        } else {
+            console.warn("No se recibió el archivo 'documento' en la petición multipart.");
         }
 
         const nuevoGaraje = await prisma.garaje.create({
@@ -31,8 +43,9 @@ const createGaraje = async (req, res, next) => {
                 nombre,
                 descripcion,
                 direccion,
-                latitud: latitud ? parseFloat(latitud) : null,
-                longitud: longitud ? parseFloat(longitud) : null,
+                // Usamos la varaible 'lat' y 'lng' normalizada arriba
+                latitud: (lat !== undefined && lat !== null && lat !== '') ? parseFloat(lat) : null,
+                longitud: (lng !== undefined && lng !== null && lng !== '') ? parseFloat(lng) : null,
                 precio_hora: precio_hora ? parseFloat(precio_hora) : null,
                 precio_dia: precio_dia ? parseFloat(precio_dia) : null,
                 minimo_horas: minimo_horas ? parseInt(minimo_horas) : 1,
@@ -61,11 +74,13 @@ const createGaraje = async (req, res, next) => {
             });
         }
 
-        // Insertar el punto geográfico en PostGIS
-        if (latitud && longitud) {
+        // Insertar el punto geográfico en PostGIS (usando variables lat y lng normalizadas)
+        if (lat !== undefined && lat !== null && lat !== '' && 
+            lng !== undefined && lng !== null && lng !== '') {
+            console.log(`Actualizando PostGIS para garaje ${nuevoGaraje.id} -> Lat: ${lat}, Lng: ${lng}`);
             await prisma.$executeRaw`
                 UPDATE "Garaje" 
-                SET ubicacion_geo = ST_SetSRID(ST_MakePoint(${parseFloat(longitud)}, ${parseFloat(latitud)}), 4326) 
+                SET ubicacion_geo = ST_SetSRID(ST_MakePoint(${parseFloat(lng)}, ${parseFloat(lat)}), 4326) 
                 WHERE id = ${nuevoGaraje.id}
             `;
         }
@@ -336,11 +351,20 @@ const getPendingGarages = async (req, res, next) => {
             }
         });
 
+        console.log(`Admin - Pending Garages: Found ${garages.length}`);
+
         // Generar URLs temporales para los documentos de propiedad
         const garagesWithUrls = await Promise.all(garages.map(async (g) => {
-            const docUrl = g.documento_propiedad_url 
-                ? await getDynamicPresignedUrl(g.documento_propiedad_url)
-                : null;
+            let docUrl = null;
+            if (g.documento_propiedad_url) {
+                try {
+                    docUrl = await getDynamicPresignedUrl(g.documento_propiedad_url);
+                } catch (urlErr) {
+                    console.error(`Error generando presigned URL para garaje ${g.id}:`, urlErr);
+                }
+            } else {
+                console.warn(`Garaje ${g.id} (${g.nombre}) no tiene documento_propiedad_url en DB`);
+            }
             return { ...g, documento_propiedad_presigned: docUrl };
         }));
 

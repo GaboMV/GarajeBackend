@@ -128,7 +128,11 @@ router.get('/profile', requireAuth, getUserProfile);
  * @swagger
  * /api/users/kyc:
  *   post:
- *     summary: Subir documentos KYC (DNI + selfie)
+ *     summary: Subir documentos KYC (DNI + selfie + teléfono)
+ *     description: |
+ *       Envía los documentos de identidad y un número de teléfono boliviano válido para iniciar
+ *       el proceso de verificación KYC. El estado del usuario pasa a `PENDIENTE`.
+ *       **Formato válido de teléfono:** debe empezar con 6 o 7 y tener 8 dígitos (ej: `74000123`).
  *     tags: [Usuarios]
  *     security:
  *       - bearerAuth: []
@@ -138,18 +142,28 @@ router.get('/profile', requireAuth, getUserProfile);
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - dni_foto
+ *               - selfie
+ *               - telefono
  *             properties:
  *               dni_foto:
  *                 type: string
  *                 format: binary
- *                 description: Foto del DNI del usuario
+ *                 description: Foto frontal y legible del DNI
  *               selfie:
  *                 type: string
  *                 format: binary
- *                 description: Selfie del usuario
+ *                 description: Selfie del usuario sosteniendo el DNI
+ *               telefono:
+ *                 type: string
+ *                 description: "Número boliviano (8 dígitos, empieza con 6 o 7). Ej: 74000123"
+ *                 example: "74000123"
  *     responses:
  *       200:
- *         description: Documentos KYC subidos exitosamente
+ *         description: Documentos KYC enviados correctamente, estado cambia a PENDIENTE
+ *       400:
+ *         description: Teléfono inválido o faltan documentos
  */
 router.post('/kyc', requireAuth, upload.fields([{ name: 'dni_foto', maxCount: 1 }, { name: 'selfie', maxCount: 1 }]), uploadKyc);
 
@@ -172,7 +186,10 @@ router.get('/kyc/pending', requireAuth, requireAdmin, getPendingKycUsers);
  * @swagger
  * /api/users/kyc/{idUsuario}:
  *   get:
- *     summary: Ver documentos KYC de un usuario (solo admin — genera URL con vigencia de 5 min)
+ *     summary: Ver documentos KYC de un usuario (solo admin — genera URLs firmadas con vigencia de 5 min)
+ *     description: |
+ *       Retorna los campos del usuario incluyendo URLs firmadas temporales para `dni_foto_url` y `selfie_url`,
+ *       además del número de `telefono` registrado durante el proceso KYC.
  *     tags: [Usuarios]
  *     security:
  *       - bearerAuth: []
@@ -185,7 +202,18 @@ router.get('/kyc/pending', requireAuth, requireAdmin, getPendingKycUsers);
  *         description: ID del usuario a consultar
  *     responses:
  *       200:
- *         description: URLs temporales generadas exitosamente
+ *         description: URLs temporales y datos KYC generados exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: string }
+ *                 correo: { type: string }
+ *                 esta_verificado: { type: string, enum: [NO_VERIFICADO, PENDIENTE, VERIFICADO, RECHAZADO] }
+ *                 telefono: { type: string, example: "74000123" }
+ *                 dni_foto_url: { type: string, description: "URL firmada válida por 5 min" }
+ *                 selfie_url: { type: string, description: "URL firmada válida por 5 min" }
  *       404:
  *         description: Usuario no encontrado
  */
@@ -196,6 +224,10 @@ router.get('/kyc/:idUsuario', requireAuth, requireAdmin, getUserKyc);
  * /api/users/approve/{idUsuario}:
  *   post:
  *     summary: Aprobar un usuario verificado (solo admin)
+ *     description: |
+ *       Cambia el estado del usuario a `VERIFICADO`.
+ *       **Además emite un evento WebSocket `kyc_approved` al usuario** con el mensaje de confirmación,
+ *       lo que actualiza la UI de la app en tiempo real sin necesidad de que el usuario recargue.
  *     tags: [Usuarios]
  *     security:
  *       - bearerAuth: []
@@ -208,7 +240,11 @@ router.get('/kyc/:idUsuario', requireAuth, requireAdmin, getUserKyc);
  *         description: ID del usuario a aprobar
  *     responses:
  *       200:
- *         description: Usuario aprobado exitosamente
+ *         description: Usuario aprobado. Emite evento WebSocket `kyc_approved` al cliente.
+ *       400:
+ *         description: El usuario ya estaba verificado
+ *       404:
+ *         description: Usuario no encontrado
  */
 router.post('/approve/:idUsuario', requireAuth, requireAdmin, approveUser);
 
