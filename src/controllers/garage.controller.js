@@ -59,19 +59,33 @@ const createGaraje = async (req, res, next) => {
             }
         });
 
+        // Asegurar que el usuario cambie a modo PROPIETARIO
+        await prisma.usuario.update({
+            where: { id: id_dueno },
+            data: { modo_actual: 'PROPIETARIO' }
+        });
+
         // Procesar imágenes adicionales del garaje (Bucket PÚBLICO)
-        if (req.files && req.files['imagenes'] && req.files['imagenes'].length > 0) {
+        if (req.files && req.files['imagenes']) {
+            console.log(`Procesando ${req.files['imagenes'].length} imágenes para el garaje...`);
             const uploadPromises = req.files['imagenes'].map(file => uploadFilePublic(file, 'garajes'));
             const uploadedImageUrls = await Promise.all(uploadPromises);
+            
+            console.log("URLs de imágenes subidas:", uploadedImageUrls);
 
-            const imagenesData = uploadedImageUrls.map(url => ({
-                id_garaje: nuevoGaraje.id,
-                url
-            }));
+            if (uploadedImageUrls.length > 0) {
+                const imagenesData = uploadedImageUrls.map(url => ({
+                    id_garaje: nuevoGaraje.id,
+                    url
+                }));
 
-            await prisma.imagenGaraje.createMany({
-                data: imagenesData
-            });
+                await prisma.imagenGaraje.createMany({
+                    data: imagenesData
+                });
+                console.log("Registros de imágenes creados en DB.");
+            }
+        } else {
+            console.warn("No se recibieron archivos en el campo 'imagenes'.");
         }
 
         // Insertar el punto geográfico en PostGIS (usando variables lat y lng normalizadas)
