@@ -184,8 +184,8 @@
         </div>
 
         <div class="tabs">
-            <div class="tab active" id="tab-kyc" onclick="switchTab('kyc')">Verificación de Usuarios (KYC)</div>
-            <div class="tab" id="tab-garages" onclick="switchTab('garages')">Garajes Pendientes</div>
+            <div class="tab active" id="tab-kyc" onclick="switchTab('kyc')">Verificación KYC <span id="count-kyc"></span></div>
+            <div class="tab" id="tab-garages" onclick="switchTab('garages')">Garajes Pendientes <span id="count-garages"></span></div>
         </div>
 
         <!-- Sección KYC -->
@@ -315,11 +315,16 @@
                 if (!res.ok) throw new Error(data.error || "Error al cargar KYC");
 
                 const usuarios = data.users || [];
+                document.getElementById('count-kyc').innerText = `(${usuarios.length})`;
                 tbody.innerHTML = usuarios.length ? '' : '<tr><td colspan="4" style="text-align:center">Sin pendientes</td></tr>';
                 usuarios.forEach(u => {
                     const badgeClass = u.esta_verificado === 'PENDIENTE' ? 'badge-pending' : 'badge-rejected';
                     tbody.innerHTML += `<tr>
-                        <td><b>${u.nombre_completo || 'Sin nombre'}</b><br><small>${u.correo}</small></td>
+                        <td>
+                            <b>${u.nombre_completo || 'Sin nombre'}</b><br>
+                            <small>${u.correo}</small><br>
+                            <code style="font-size:0.6rem; color:var(--text-dim)">ID: ${u.id}</code>
+                        </td>
                         <td>${new Date(u.fecha_creacion).toLocaleDateString()}</td>
                         <td><span class="badge ${badgeClass}">${u.esta_verificado}</span></td>
                         <td><button onclick="openKYC('${u.id}', '${u.correo}', '${u.esta_verificado}', '${u.motivo_rechazo_kyc || ""}')">Revisar</button></td>
@@ -341,10 +346,15 @@
                 if (!res.ok) throw new Error(data.error || "Error al cargar garajes");
 
                 pendingGaragesList = data.garages || [];
+                document.getElementById('count-garages').innerText = `(${pendingGaragesList.length})`;
                 tbody.innerHTML = pendingGaragesList.length ? '' : '<tr><td colspan="3" style="text-align:center">Sin pendientes</td></tr>';
                 pendingGaragesList.forEach(g => {
                     tbody.innerHTML += `<tr>
-                        <td><b>${g.nombre}</b><br><small>Dueño: ${g.dueno?.nombre_completo}</small></td>
+                        <td>
+                            <b>${g.nombre}</b><br>
+                            <small>Dueño: ${g.dueno?.nombre_completo || 'Desconocido'}</small><br>
+                            <code style="font-size:0.6rem; color:var(--text-dim)">ID: ${g.id}</code>
+                        </td>
                         <td>${g.direccion || 'S/D'}</td>
                         <td><button onclick="openGarage('${g.id}')">Ver Detalle</button></td>
                     </tr>`;
@@ -392,10 +402,16 @@
             
             const legalContent = document.getElementById('legal-doc-content');
             if (garage.documento_propiedad_presigned) {
-                legalContent.innerHTML = `<img src="${garage.documento_propiedad_presigned}" style="max-width:300px; border-radius:8px;" onclick="window.open(this.src)">
-                    <p style="font-size:0.8rem; margin-top:5px;">Click para ampliar</p>`;
+                legalContent.innerHTML = `
+                    <div style="margin-bottom:10px; font-size:0.8rem; color:var(--text-dim)">Key: <code>${garage.documento_propiedad_url}</code></div>
+                    <img src="${garage.documento_propiedad_presigned}" style="max-width:100%; max-height:400px; border-radius:8px; border:2px solid var(--primary);" 
+                         onerror="this.parentElement.innerHTML+='<p style=color:red>Error al cargar imagen (URL expirada o inválida)</p>'"
+                         onclick="window.open(this.src)">
+                    <p style="font-size:0.8rem; margin-top:8px; color:var(--text-dim)">Si la imagen no carga, el Admin puede intentar refrescar.</p>`;
             } else {
-                legalContent.innerHTML = `<p style="color:var(--error)">No se adjuntó documento de propiedad</p>`;
+                legalContent.innerHTML = `
+                    <p style="color:var(--error); font-weight:bold;">⚠️ No se encontró Key de documento en la DB</p>
+                    <p style="font-size:0.8rem; color:var(--text-dim)">ID del Garaje: ${garage.id}</p>`;
             }
 
             document.getElementById('garage-images').innerHTML = (garage.imagenes || []).map(i => `<div class="image-card"><img src="${i.url}" onclick="window.open(this.src)"></div>`).join('');
