@@ -69,10 +69,22 @@ const register = async (req, res, next) => {
 const uploadKyc = async (req, res, next) => {
     try {
         const userId = req.user.id;
+        const { telefono } = req.body;
 
         // Validar que se enviaron ambos archivos
         if (!req.files || !req.files.dni_foto || !req.files.selfie) {
             return res.status(400).json({ error: 'Debes subir ambas fotos: dni_foto y selfie' });
+        }
+
+        if (!telefono) {
+            return res.status(400).json({ error: 'El número de teléfono es obligatorio.' });
+        }
+
+        // Validación básica de teléfono de Bolivia
+        // Comienza con 6 o 7, y tiene 8 dígitos
+        const telefonoLimpio = telefono.replace(/\s+/g, '');
+        if (!/^[67]\d{7}$/.test(telefonoLimpio)) {
+            return res.status(400).json({ error: 'Número de teléfono inválido para Bolivia (debe empezar con 6 o 7 y tener 8 dígitos).' });
         }
 
         const fileDni = req.files.dni_foto[0];
@@ -87,6 +99,7 @@ const uploadKyc = async (req, res, next) => {
             data: {
                 dni_foto_url,
                 selfie_url,
+                telefono: telefonoLimpio,
                 // El usuario pasa a PENDIENTE de revisión
                 esta_verificado: "PENDIENTE"
             }
@@ -120,6 +133,7 @@ const getUserKyc = async (req, res, next) => {
 
         res.json({
             usuario: user.correo,
+            telefono: user.telefono || 'Sin registro',
             estado: user.esta_verificado === "VERIFICADO" ? 'Aprobado' : 'Pendiente',
             documentos_temporales_5min: {
                 dni_frontal: dniUrl,
@@ -155,6 +169,15 @@ const approveUser = async (req, res, next) => {
                 motivo_rechazo_kyc: null // Limpiamos motivo si se aprueba
             }
         });
+
+        // Emitimos notificación por WebSocket
+        const io = req.app.get('socketio');
+        if (io) {
+            io.to(idUsuario).emit('kyc_approved', {
+                message: '¡Tu cuenta ha sido verificada! Ya puedes publicar garajes y hacer reservas.',
+                userId: idUsuario
+            });
+        }
 
         res.json({
             message: 'Usuario aprobado exitosamente. Ya puede operar en la app.',

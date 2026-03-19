@@ -56,11 +56,24 @@ router.use(requireAuth);
  *               capacidad:
  *                 type: integer
  *                 description: Capacidad máxima
+ *               documento:
+ *                 type: string
+ *                 format: binary
+ *                 description: Documento de propiedad (imagen o PDF)
+ *               imagenes:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *                 description: Fotos del garaje (max 5)
  *     responses:
  *       201:
  *         description: Garaje creado exitosamente
  */
-router.post('/', requireVerifiedKYC, createGaraje);
+router.post('/', requireVerifiedKYC, upload.fields([
+    { name: 'imagenes', maxCount: 5 },
+    { name: 'documento', maxCount: 1 }
+]), createGaraje);
 
 /**
  * @swagger

@@ -10,7 +10,8 @@ const PORT = process.env.PORT || 3000;
 const httpServer = http.createServer(app);
 
 // Inicializar Socket.io sobre el mismo servidor HTTP
-initSocketGateway(httpServer);
+const io = initSocketGateway(httpServer);
+app.set('socketio', io);
 
 async function main() {
     try {

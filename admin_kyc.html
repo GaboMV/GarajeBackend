@@ -361,7 +361,7 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error);
 
-                document.getElementById('kyc-user-info').innerText = email + ` (${status})`;
+                document.getElementById('kyc-user-info').innerText = `${email} (${status}) | Tel: ${data.telefono || 'N/A'}`;
                 
                 const reasonBox = document.getElementById('kyc-reject-reason-box');
                 if (reason) {
