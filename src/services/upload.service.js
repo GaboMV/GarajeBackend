@@ -36,8 +36,11 @@ const uploadFilePublic = async (file, folder = 'general') => {
 
     await s3Client.send(command);
 
-    if (R2_PUBLIC_URL) {
-        return `${R2_PUBLIC_URL}/${fileName}`;
+    // Limpiar R2_PUBLIC_URL de posibles barras diagonales al final
+    const publicUrlBase = R2_PUBLIC_URL ? R2_PUBLIC_URL.replace(/\/+$/, '') : null;
+
+    if (publicUrlBase) {
+        return `${publicUrlBase}/${fileName}`;
     }
 
     return `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${BUCKET_PUBLIC}/${fileName}`;

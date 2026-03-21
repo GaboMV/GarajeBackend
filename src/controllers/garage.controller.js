@@ -37,6 +37,22 @@ const createGaraje = async (req, res, next) => {
             console.warn("No se recibió el archivo 'documento' en la petición multipart.");
         }
 
+        // REGLA DE NEGOCIO: Un usuario no puede subir más de un garaje si ya tiene uno PENDIENTE de aprobación.
+        // Esto evita spam y asegura una revisión controlada.
+        const garajePendiente = await prisma.garaje.findFirst({
+            where: {
+                id_dueno,
+                esta_aprobado: false
+            }
+        });
+
+        if (garajePendiente) {
+            return res.status(400).json({ 
+                error: 'Ya tienes una solicitud de garaje pendiente de revisión.',
+                message: 'Por favor espera a que el administrador apruebe tu espacio actual antes de subir otro.'
+            });
+        }
+
         const nuevoGaraje = await prisma.garaje.create({
             data: {
                 id_dueno,
@@ -60,7 +76,7 @@ const createGaraje = async (req, res, next) => {
         });
 
         // Asegurar que el usuario cambie a modo PROPIETARIO
-        await prisma.usuario.update({
+        const usuarioActualizado = await prisma.usuario.update({
             where: { id: id_dueno },
             data: { modo_actual: 'PROPIETARIO' }
         });
@@ -101,7 +117,13 @@ const createGaraje = async (req, res, next) => {
 
         res.status(201).json({
             message: 'Garaje creado exitosamente',
-            garaje: nuevoGaraje
+            garaje: nuevoGaraje,
+            user: {
+                id: usuarioActualizado.id,
+                nombre_completo: usuarioActualizado.nombre_completo,
+                esta_verificado: usuarioActualizado.esta_verificado,
+                modo_actual: usuarioActualizado.modo_actual
+            }
         });
     } catch (error) {
         next(error);
