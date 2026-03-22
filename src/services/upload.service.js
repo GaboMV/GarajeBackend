@@ -15,7 +15,6 @@ const s3Client = new S3Client({
 
 const BUCKET_PUBLIC = process.env.R2_BUCKET_PUBLIC || 'garajes-public';
 const BUCKET_PRIVATE = process.env.R2_BUCKET_PRIVATE || 'garajes-kyc';
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL; // Solo para garajes
 
 /**
  * 1. Subida a bucket PÚBLICO (Garajes)
@@ -37,6 +36,7 @@ const uploadFilePublic = async (file, folder = 'general') => {
     await s3Client.send(command);
 
     // Limpiar R2_PUBLIC_URL de posibles barras diagonales al final
+    const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
     const publicUrlBase = R2_PUBLIC_URL ? R2_PUBLIC_URL.replace(/\/+$/, '') : null;
 
     if (publicUrlBase) {
@@ -95,6 +95,7 @@ const deleteFilePublic = async (fileUrl) => {
         if (!fileUrl) return;
 
         let keyText = fileUrl;
+        const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
         if (R2_PUBLIC_URL && fileUrl.startsWith(R2_PUBLIC_URL)) {
             keyText = fileUrl.replace(`${R2_PUBLIC_URL}/`, '');
         } else {
