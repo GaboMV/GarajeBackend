@@ -13,7 +13,8 @@ const createGaraje = async (req, res, next) => {
             latitud, longitud, precio_hora, precio_dia,
             minimo_horas, tiempo_limpieza,
             tiene_wifi, tiene_bano, tiene_electricidad, tiene_mesa,
-            servicios_extra
+            servicios_extra,
+            hora_inicio_jornada, hora_fin_jornada
         } = req.body;
 
         // Capturar coordenadas de varias posibles fuentes (latitud/longitud o lat/lng)
@@ -73,6 +74,8 @@ const createGaraje = async (req, res, next) => {
                 tiene_mesa: tiene_mesa === 'true' || tiene_mesa === true,
                 esta_aprobado: false, // Siempre requiere aprobación inicial
                 documento_propiedad_url: documentoPropiedadUrl,
+                hora_inicio_jornada: hora_inicio_jornada || "08:00",
+                hora_fin_jornada: hora_fin_jornada || "20:00",
             }
         });
 
