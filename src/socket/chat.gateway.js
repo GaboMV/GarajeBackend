@@ -101,12 +101,16 @@ function initSocketGateway(httpServer) {
         // key_adjunto es la KEY de R2 privado devuelta por POST /api/chat/presigned-url
         socket.on('send_message', async ({ reservaId, contenido, key_adjunto }) => {
             try {
+                console.log(`📩 Recibido send_message de ${socket.user.id} para reserva ${reservaId}: ${contenido?.substring(0, 20)}...`);
+
                 if (!reservaId || !contenido?.trim()) {
+                    console.log('⚠️ Error: reservaId o contenido faltantes');
                     return socket.emit('error', { message: 'reservaId y contenido son requeridos.' });
                 }
 
                 // Validar que el socket está en ese room
                 if (!socket.activeRooms?.has(reservaId)) {
+                    console.log(`⚠️ Error: Usuario ${socket.user.id} no está en el room ${reservaId}`);
                     return socket.emit('error', { message: 'No estás en este room. Haz join_room primero.' });
                 }
 
@@ -152,6 +156,7 @@ function initSocketGateway(httpServer) {
 
                 // Emitir a TODOS en el room (incluyendo al emisor para confirmación)
                 io.to(reservaId).emit('receive_message', mensajeGuardado);
+                console.log(`📤 Mensaje emitido a room ${reservaId}`);
 
             } catch (err) {
                 console.error('[send_message error]', err.message);
