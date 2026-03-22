@@ -498,6 +498,76 @@ const uploadPropertyDoc = async (req, res, next) => {
     }
 }
 
+/**
+ * 9. Eliminar Garaje Completo
+ * Borra registros en cascada (imágenes, horarios, etc) y los archivos en R2.
+ */
+const deleteGaraje = async (req, res, next) => {
+    try {
+        const id_dueno = req.user.id;
+        const { idGaraje } = req.params;
+
+        // Validar propiedad
+        const garaje = await prisma.garaje.findUnique({
+            where: { id: idGaraje },
+            include: { imagenes: true }
+        });
+
+        if (!garaje || garaje.id_dueno !== id_dueno) {
+            return res.status(403).json({ error: 'No tienes permisos para eliminar este garaje' });
+        }
+
+        // 1. Eliminar imágenes de R2 (Público)
+        const deleteImgPromises = garaje.imagenes.map(img => deleteFilePublic(img.url));
+        await Promise.all(deleteImgPromises);
+
+        // 2. Eliminar documento de propiedad de R2 (Privado)
+        if (garaje.documento_propiedad_url) {
+            await deleteFilePrivate(garaje.documento_propiedad_url);
+        }
+
+        // 3. Eliminar de la base de datos (Prisma eliminará en cascada lo que esté configurado, 
+        // pero preferimos hacerlo explícito o confiar en el schema)
+        await prisma.garaje.delete({ where: { id: idGaraje } });
+
+        res.json({ message: 'Garaje y todos sus recursos eliminados correctamente' });
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * 10. Eliminar Imagen Específica de un Garaje
+ */
+const deleteImagenGaraje = async (req, res, next) => {
+    try {
+        const id_dueno = req.user.id;
+        const { idGaraje, idImagen } = req.params;
+
+        // Validar propiedad del garaje
+        const garaje = await prisma.garaje.findUnique({ where: { id: idGaraje } });
+        if (!garaje || garaje.id_dueno !== id_dueno) {
+            return res.status(403).json({ error: 'No tienes permisos sobre este garaje' });
+        }
+
+        // Buscar imagen
+        const imagen = await prisma.imagenGaraje.findUnique({ where: { id: idImagen } });
+        if (!imagen || imagen.id_garaje !== idGaraje) {
+            return res.status(404).json({ error: 'Imagen no encontrada en este garaje' });
+        }
+
+        // 1. Eliminar de R2
+        await deleteFilePublic(imagen.url);
+
+        // 2. Eliminar de la BD
+        await prisma.imagenGaraje.delete({ where: { id: idImagen } });
+
+        res.json({ message: 'Imagen eliminada correctamente' });
+    } catch (error) {
+        next(error);
+    }
+}
+
 module.exports = {
     createGaraje,
     addHorario,
@@ -509,5 +579,7 @@ module.exports = {
     updateGarage,
     getPendingGarages,
     approveGarage,
-    uploadPropertyDoc
+    uploadPropertyDoc,
+    deleteGaraje,
+    deleteImagenGaraje
 };

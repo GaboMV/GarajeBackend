@@ -12,7 +12,9 @@ const {
     updateGarage,
     getPendingGarages,
     approveGarage,
-    uploadPropertyDoc
+    uploadPropertyDoc,
+    deleteGaraje,
+    deleteImagenGaraje
 } = require('../controllers/garage.controller');
 const { requireAuth, requireVerifiedKYC, requireAdmin } = require('../middlewares/auth.middleware');
 const upload = require('../middlewares/upload.middleware');
@@ -393,5 +395,46 @@ router.get('/admin/pending', requireAuth, requireAdmin, getPendingGarages);
  *         description: Garaje no encontrado
  */
 router.post('/admin/approve/:idGaraje', requireAuth, requireAdmin, approveGarage);
+
+/**
+ * @swagger
+ * /api/garages/{idGaraje}:
+ *   delete:
+ *     summary: Eliminar un garaje completo
+ *     tags: [Garajes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: idGaraje
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Garaje eliminado
+ */
+router.delete('/:idGaraje', requireAuth, deleteGaraje);
+
+/**
+ * @swagger
+ * /api/garages/{idGaraje}/imagenes/{idImagen}:
+ *   delete:
+ *     summary: Eliminar una imagen específica de un garaje
+ *     tags: [Garajes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: idGaraje
+ *         required: true
+ *       - in: path
+ *         name: idImagen
+ *         required: true
+ *     responses:
+ *       200:
+ *         description: Imagen eliminada
+ */
+router.delete('/:idGaraje/imagenes/:idImagen', requireAuth, deleteImagenGaraje);
 
 module.exports = router;

@@ -163,6 +163,15 @@ const createReservation = async (req, res, next) => {
             reserva: nuevaReserva
         });
 
+        // Emitir notificación al dueño del garaje
+        const io = req.app.get('socketio');
+        if (io) {
+            io.to(garaje.id_dueno).emit('new_reservation_request', {
+                message: `¡Tienes una nueva solicitud de reserva para ${garaje.nombre}!`,
+                reservaId: nuevaReserva.id
+            });
+        }
+
     } catch (error) {
         next(error);
     }

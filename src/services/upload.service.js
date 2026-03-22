@@ -147,11 +147,30 @@ const getPresignedChatUrl = async (key) => {
     return getSignedUrl(s3Client, command, { expiresIn: 300 });
 };
 
+/**
+ * 7. Eliminar archivo PRIVADO (Usado al borrar garaje o cancelar KYC)
+ */
+const deleteFilePrivate = async (key) => {
+    try {
+        if (!key) return;
+
+        const command = new DeleteObjectCommand({
+            Bucket: BUCKET_PRIVATE,
+            Key: key,
+        });
+
+        await s3Client.send(command);
+    } catch (error) {
+        console.error("Error al eliminar el archivo de R2 Privado:", error);
+    }
+}
+
 module.exports = {
     uploadFilePublic,
     uploadFilePrivate,
     getDynamicPresignedUrl,
     deleteFilePublic,
+    deleteFilePrivate,
     getPresignedUploadUrl,
     getPresignedChatUrl
 };
