@@ -8,8 +8,10 @@ const searchGarajes = async (req, res, next) => {
     try {
         const { fecha, hora_inicio, hora_fin, lat, lng, radio_km } = req.query;
         
-        // Los filtros de tiempo son opcionales para evitar error 400
-        const hasTimeFilters = fecha && hora_inicio && hora_fin;
+        // Los filtros de tiempo se activan si hay fecha (las horas son opcionales)
+        const hasDateFilter = !!fecha;
+        const searchHoraInicio = hora_inicio || '00:00';
+        const searchHoraFin = hora_fin || '23:59';
 
         // Preparar filtro base
         let whereFiltro = {
@@ -62,15 +64,15 @@ const searchGarajes = async (req, res, next) => {
             }
         });
 
-        // Aplicamos "La Matemática del Backend" (Filtro) SOLO SI hay parámetros de tiempo
-        const garajesDisponibles = hasTimeFilters ? garajes.filter(garaje => {
+        // Aplicamos "La Matemática del Backend" (Filtro) SOLO SI hay parámetros de tiempo o fecha
+        const garajesDisponibles = hasDateFilter ? garajes.filter(garaje => {
             const searchDate = new Date(fecha);
             const dayOfWeek = searchDate.getDay(); // 0 (Dom) a 6 (Sab)
             
             const horarioHoy = garaje.horarios_semanales.find(h => h.dia_semana === dayOfWeek);
             if (!horarioHoy || !horarioHoy.abierto) return false;
 
-            if (hora_inicio < horarioHoy.hora_inicio || hora_fin > horarioHoy.hora_fin) {
+            if (searchHoraInicio < horarioHoy.hora_inicio || searchHoraFin > horarioHoy.hora_fin) {
                 return false;
             }
 
@@ -85,8 +87,8 @@ const searchGarajes = async (req, res, next) => {
                 return (h * 60) + m;
             };
 
-            const searchStartMin = timeToMinutes(hora_inicio);
-            const searchEndMin = timeToMinutes(hora_fin);
+            const searchStartMin = timeToMinutes(searchHoraInicio);
+            const searchEndMin = timeToMinutes(searchHoraFin);
 
             garaje.reservas.forEach(reserva => {
                 let reservaChoca = false;
