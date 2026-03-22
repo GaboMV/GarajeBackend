@@ -158,6 +158,29 @@ function initSocketGateway(httpServer) {
                 io.to(reservaId).emit('receive_message', mensajeGuardado);
                 console.log(`📤 Mensaje emitido a room ${reservaId}`);
 
+                // Notificar directamente al receptor en su room personal
+                const isEmisorVendedor = reserva.id_vendedor === socket.user.id;
+                const receptorId = isEmisorVendedor ? reserva.garaje.id_dueno : reserva.id_vendedor;
+                
+                io.to(receptorId).emit('new_message_notification', {
+                    reservaId: reservaId,
+                    emisorName: socket.user.nombre_completo,
+                    contenido: contenido
+                });
+
+                // Persistir la notificación en DB para el historial
+                try {
+                    await prisma.notificacion.create({
+                        data: {
+                            id_usuario: receptorId,
+                            titulo: 'Nuevo mensaje de chat',
+                            cuerpo: `${socket.user.nombre_completo} te ha enviado un mensaje.`
+                        }
+                    });
+                } catch (notifErr) {
+                    console.error('[send_message] Error guardando notificacion DB:', notifErr.message);
+                }
+
             } catch (err) {
                 console.error('[send_message error]', err.message);
                 socket.emit('error', { message: 'Error al enviar el mensaje.' });
