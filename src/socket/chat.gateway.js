@@ -22,10 +22,14 @@ function initSocketGateway(httpServer) {
     // Rechaza cualquier conexión sin JWT válido ANTES de que entre al sistema
     io.use(async (socket, next) => {
         try {
-            const token = socket.handshake.auth?.token;
+            let token = socket.handshake.auth?.token;
 
             if (!token) {
                 return next(new Error('AUTH_REQUIRED: Sin token de autenticación.'));
+            }
+
+            if (token.startsWith('Bearer ')) {
+                token = token.slice(7);
             }
 
             const decoded = jwt.verify(token, JWT_SECRET);

@@ -475,6 +475,7 @@ const approveGarage = async (req, res, next) => {
         // Emitimos notificación por WebSocket al dueño del garaje
         const io = req.app.get('socketio');
         if (io && garage.id_dueno) {
+            console.log(`[Socket.io] Emitiendo evento 'garage_approved' a la room (usuario): ${garage.id_dueno}`);
             io.to(garage.id_dueno).emit('garage_approved', {
                 message: '¡Tu espacio ha sido aprobado y ya está visible para reservas!',
                 garageId: idGaraje
