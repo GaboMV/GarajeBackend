@@ -11,7 +11,8 @@ const createReservation = async (req, res, next) => {
         const {
             id_garaje, fecha, hora_inicio, hora_fin,
             mensaje_inicial, acepto_terminos_responsabilidad,
-            servicios_extra // Array de objetos: [{ id_servicio, cantidad }]
+            servicios_extra, // Array de objetos: [{ id_servicio, cantidad }]
+            categorias_venta // Array de strings: ['Ropa', 'Juguetes']
         } = req.body;
 
         if (!acepto_terminos_responsabilidad) {
@@ -65,7 +66,6 @@ const createReservation = async (req, res, next) => {
         }
 
         // --- CALCULO FINANCIERO SIMPLE ---
-        // Convertimos las horas a fracciones para cobrar (Ej: 14:00 a 16:30 = 2.5 horas)
         const timeToDecimal = (t) => {
             const [h, m] = t.split(':').map(Number);
             return h + (m / 60);
@@ -76,7 +76,6 @@ const createReservation = async (req, res, next) => {
             return res.status(400).json({ error: `El mínimo de horas es ${garaje.minimo_horas}` });
         }
 
-        // Asumimos Tipo Cobro POR HORA por defecto si hay precio_hora
         let subtotal = 0;
         let tipo_cobro = "POR_HORA";
 
@@ -87,7 +86,6 @@ const createReservation = async (req, res, next) => {
             tipo_cobro = "POR_DIA";
         }
 
-        // Sumar servicios adicionales
         let totalServicios = 0;
         const serviciosReservaData = [];
 
@@ -108,15 +106,26 @@ const createReservation = async (req, res, next) => {
         }
 
         const precio_total = subtotal + totalServicios;
-
-        // Obtener configuración global (Ej: 10% de comisión)
-        // En un caso real se consulta a ConfiguracionPlataforma, usaremos 10% fijo para el ejemplo
         const COMISION_PORCENTAJE = 0.10;
         const comision_app = precio_total * COMISION_PORCENTAJE;
         const monto_dueno = precio_total - comision_app;
 
-        // Crear la reserva y sus dependencias (transaccional)
         const nuevaReserva = await prisma.$transaction(async (tx) => {
+            // Resolver Categorias primero
+            const categoriasReservaData = [];
+            if (categorias_venta && Array.isArray(categorias_venta)) {
+                for (const catName of categorias_venta) {
+                    if (!catName.trim()) continue;
+                    let cat = await tx.categoriaProducto.findFirst({
+                        where: { nombre: { equals: catName.trim(), mode: 'insensitive' } }
+                    });
+                    if (!cat) {
+                        cat = await tx.categoriaProducto.create({ data: { nombre: catName.trim() } });
+                    }
+                    categoriasReservaData.push({ id_categoria: cat.id });
+                }
+            }
+
             const reserva = await tx.reserva.create({
                 data: {
                     id_garaje,
@@ -128,7 +137,7 @@ const createReservation = async (req, res, next) => {
                     monto_dueno,
                     mensaje_inicial,
                     acepto_terminos_responsabilidad,
-                    version_terminos: "v1.0.0", // Hardcoded para el ejemplo
+                    version_terminos: "v1.0.0",
                     ip_aceptacion: req.ip || "127.0.0.1",
 
                     fechas: {
@@ -140,11 +149,21 @@ const createReservation = async (req, res, next) => {
                     },
                     servicios_extra: serviciosReservaData.length > 0 ? {
                         create: serviciosReservaData
+                    } : undefined,
+                    categorias: categoriasReservaData.length > 0 ? {
+                        create: categoriasReservaData
+                    } : undefined,
+                    mensajes: mensaje_inicial ? {
+                        create: [{
+                            id_emisor: id_vendedor,
+                            contenido: mensaje_inicial
+                        }]
                     } : undefined
                 },
                 include: {
                     fechas: true,
-                    servicios_extra: true
+                    servicios_extra: true,
+                    categorias: { include: { categoria: true } }
                 }
             });
 
@@ -371,6 +390,9 @@ const getReservationById = async (req, res, next) => {
                 comprobante_pago: true,
                 servicios_extra: {
                     include: { servicio: true }
+                },
+                categorias: {
+                    include: { categoria: true }
                 }
             }
         });
