@@ -48,6 +48,10 @@ function initSocketGateway(httpServer) {
     io.on('connection', (socket) => {
         console.log(`🔌 Socket conectado: ${socket.user.nombre_completo} (${socket.user.id})`);
 
+        // Unirse a la sala personal para recibir notificaciones directas (KYC, Reservas)
+        socket.join(socket.user.id);
+        console.log(`🔔 ${socket.user.nombre_completo} unido a room personal: ${socket.user.id}`);
+
         // ── join_room ────────────────────────────────────────────────────────
         // El cliente envía: { reservaId }
         // El backend valida que el usuario pertenece a esa reserva y lo une al room
