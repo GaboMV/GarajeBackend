@@ -297,7 +297,9 @@ const getMyGarages = async (req, res, next) => {
             where: { id_dueno },
             include: {
                 imagenes: true,
-                horarios_semanales: true
+                horarios_semanales: true,
+                servicios_adicionales: true,
+                fechas_bloqueadas: true,
             }
         });
         res.json({ garajes });

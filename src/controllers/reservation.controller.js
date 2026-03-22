@@ -312,17 +312,27 @@ const getOwnerReservations = async (req, res, next) => {
             include: {
                 garaje: {
                     select: {
-                        nombre: true
+                        id: true,
+                        nombre: true,
+                        direccion: true,
+                        imagenes: true,
+                        precio_hora: true,
+                        precio_dia: true
                     }
                 },
                 vendedor: {
                     select: {
+                        id: true,
                         nombre_completo: true,
                         correo: true,
-                        url_foto_perfil: true
+                        url_foto_perfil: true,
+                        telefono: true
                     }
                 },
-                fechas: true
+                fechas: true,
+                servicios_extra: {
+                    include: { servicio: true }
+                }
             },
             orderBy: { fecha_creacion: 'desc' }
         });
@@ -384,10 +394,10 @@ const getReservationById = async (req, res, next) => {
 }
 
 /**
- * 6. Aprobar Reserva (Dueño de Garaje)
- * El dueño acepta la solicitud del vendedor.
+ * 6. Aprobar Solicitud para Chat (Dueño de Garaje)
+ * Pasa de PENDIENTE a EN_NEGOCIACION.
  */
-const approveReservation = async (req, res, next) => {
+const acceptForChat = async (req, res, next) => {
     try {
         const id_dueno = req.user.id;
         const { idReserva } = req.params;
@@ -402,7 +412,44 @@ const approveReservation = async (req, res, next) => {
         }
 
         if (reserva.estado !== 'PENDIENTE') {
-            return res.status(400).json({ error: `No se puede aprobar una reserva en estado ${reserva.estado}` });
+            return res.status(400).json({ error: `La solicitud debe estar en PENDIENTE. Estado actual: ${reserva.estado}` });
+        }
+
+        const updatedReserva = await prisma.reserva.update({
+            where: { id: idReserva },
+            data: { estado: 'EN_NEGOCIACION' }
+        });
+
+        res.json({
+            message: 'Solicitud aprobada para negociar. Ahora ambos pueden charlar.',
+            reserva: updatedReserva
+        });
+
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * 6.5 Confirmar Reserva Final (Dueño de Garaje)
+ * Pasa de EN_NEGOCIACION a ACEPTADA (lista para pagar).
+ */
+const confirmReservation = async (req, res, next) => {
+    try {
+        const id_dueno = req.user.id;
+        const { idReserva } = req.params;
+
+        const reserva = await prisma.reserva.findUnique({
+            where: { id: idReserva },
+            include: { garaje: true }
+        });
+
+        if (!reserva || reserva.garaje.id_dueno !== id_dueno) {
+            return res.status(403).json({ error: 'Reserva no encontrada o no tienes permisos' });
+        }
+
+        if (!['PENDIENTE', 'EN_NEGOCIACION'].includes(reserva.estado)) {
+            return res.status(400).json({ error: `No se puede confirmar una reserva en estado ${reserva.estado}` });
         }
 
         const updatedReserva = await prisma.reserva.update({
@@ -411,7 +458,7 @@ const approveReservation = async (req, res, next) => {
         });
 
         res.json({
-            message: 'Reserva aprobada exitosamente. El cliente ahora puede proceder al pago.',
+            message: 'Reserva conformada exitosamente. El cliente ahora puede proceder al pago.',
             reserva: updatedReserva
         });
 
@@ -469,6 +516,7 @@ module.exports = {
     getMyReservations,
     getOwnerReservations,
     getReservationById,
-    approveReservation,
+    acceptForChat,
+    confirmReservation,
     rejectReservation
 };
