@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { createReservation, payReservation, getMyReservations, getOwnerReservations, getReservationById, approveReservation, rejectReservation } = require('../controllers/reservation.controller');
+const { createReservation, payReservation, getMyReservations, getOwnerReservations, getReservationById, acceptForChat, confirmReservation, rejectReservation } = require('../controllers/reservation.controller');
 const { requireAuth, requireVerifiedKYC } = require('../middlewares/auth.middleware');
 
 // La reserva requiere estar autenticado
@@ -62,17 +62,31 @@ router.get('/:idReserva', getReservationById);
 
 /**
  * @swagger
- * /api/reservations/{idReserva}/approve:
+ * /api/reservations/{idReserva}/accept_chat:
  *   post:
- *     summary: Aprobar una solicitud de reserva (solo el dueño del garaje)
+ *     summary: Aprobar una solicitud de reserva para iniciar chat de negociación (solo el dueño)
  *     tags: [Reservas]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Reserva aprobada exitosamente
+ *         description: Solicitud aprobada para negociación exitosamente
  */
-router.post('/:idReserva/approve', requireVerifiedKYC, approveReservation);
+router.post('/:idReserva/accept_chat', requireVerifiedKYC, acceptForChat);
+
+/**
+ * @swagger
+ * /api/reservations/{idReserva}/confirm:
+ *   post:
+ *     summary: Confirmar una reserva finalmente (solo el dueño)
+ *     tags: [Reservas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Reserva confirmada exitosamente
+ */
+router.post('/:idReserva/confirm', requireVerifiedKYC, confirmReservation);
 
 /**
  * @swagger

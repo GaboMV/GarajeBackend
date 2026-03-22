@@ -50,7 +50,15 @@ const searchGarajes = async (req, res, next) => {
                         }
                     }
                 },
-                imagenes: true
+                imagenes: true,
+                servicios_adicionales: true,
+                dueno: {
+                    select: {
+                        id: true,
+                        nombre_completo: true,
+                        url_foto_perfil: true
+                    }
+                }
             }
         });
 
