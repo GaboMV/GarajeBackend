@@ -220,6 +220,33 @@ const addServicioAdicional = async (req, res, next) => {
 };
 
 /**
+ * 3.5. Eliminar un Servicio Adicional
+ */
+const deleteServicioAdicional = async (req, res, next) => {
+    try {
+        const id_dueno = req.user.id;
+        const { idGaraje, idServicio } = req.params;
+
+        // Validar propiedad
+        const garaje = await prisma.garaje.findUnique({ where: { id: idGaraje } });
+        if (!garaje || garaje.id_dueno !== id_dueno) {
+            return res.status(403).json({ error: 'No tienes permisos sobre este garaje' });
+        }
+
+        await prisma.servicioAdicional.delete({
+            where: { id: idServicio }
+        });
+
+        res.json({ message: 'Servicio eliminado correctamente' });
+    } catch (error) {
+        if (error.code === 'P2025') {
+            return res.status(404).json({ error: 'Servicio no encontrado' });
+        }
+        next(error);
+    }
+};
+
+/**
  * 4. Bloquear una Fecha Específica
  * El dueño puede bloquear porque se va de viaje o por mantenimiento.
  */
@@ -614,5 +641,6 @@ module.exports = {
     approveGarage,
     uploadPropertyDoc,
     deleteGaraje,
-    deleteImagenGaraje
+    deleteImagenGaraje,
+    deleteServicioAdicional
 };

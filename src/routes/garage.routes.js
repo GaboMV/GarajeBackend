@@ -14,7 +14,8 @@ const {
     approveGarage,
     uploadPropertyDoc,
     deleteGaraje,
-    deleteImagenGaraje
+    deleteImagenGaraje,
+    deleteServicioAdicional
 } = require('../controllers/garage.controller');
 const { requireAuth, requireVerifiedKYC, requireAdmin } = require('../middlewares/auth.middleware');
 const upload = require('../middlewares/upload.middleware');
@@ -243,6 +244,27 @@ router.post('/:idGaraje/horarios', requireVerifiedKYC, addHorario);
  *         description: Servicio adicional agregado exitosamente
  */
 router.post('/:idGaraje/servicios', requireVerifiedKYC, addServicioAdicional);
+
+/**
+ * @swagger
+ * /api/garages/{idGaraje}/servicios/{idServicio}:
+ *   delete:
+ *     summary: Eliminar un servicio adicional de un garaje
+ *     tags: [Garajes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: idGaraje
+ *         required: true
+ *       - in: path
+ *         name: idServicio
+ *         required: true
+ *     responses:
+ *       200:
+ *         description: Servicio eliminado
+ */
+router.delete('/:idGaraje/servicios/:idServicio', requireVerifiedKYC, deleteServicioAdicional);
 
 /**
  * @swagger
