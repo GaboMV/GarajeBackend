@@ -24,7 +24,9 @@ const uploadFilePublic = async (file, folder = 'general') => {
     if (!file) return null;
 
     const fileExtension = path.extname(file.originalname);
-    const fileName = `${folder}/${crypto.randomUUID()}${fileExtension}`;
+    const fileName = (folder === BUCKET_PUBLIC || folder === 'general') 
+        ? `${crypto.randomUUID()}${fileExtension}`
+        : `${folder}/${crypto.randomUUID()}${fileExtension}`;
 
     const command = new PutObjectCommand({
         Bucket: BUCKET_PUBLIC,
