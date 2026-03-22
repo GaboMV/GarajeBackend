@@ -12,7 +12,8 @@ const createReservation = async (req, res, next) => {
             id_garaje, fecha, hora_inicio, hora_fin,
             mensaje_inicial, acepto_terminos_responsabilidad,
             servicios_extra, // Array de objetos: [{ id_servicio, cantidad }]
-            categorias_venta // Array de strings: ['Ropa', 'Juguetes']
+            categorias_venta, // Array de strings: ['Ropa', 'Juguetes']
+            tipo_cobro: tipo_cobro_req
         } = req.body;
 
         if (!acepto_terminos_responsabilidad) {
@@ -77,10 +78,13 @@ const createReservation = async (req, res, next) => {
         }
 
         let subtotal = 0;
-        let tipo_cobro = "POR_HORA";
+        let tipo_cobro = tipo_cobro_req || "POR_HORA";
 
-        if (garaje.precio_hora) {
+        if (tipo_cobro === "POR_DIA" && garaje.precio_dia) {
+            subtotal = parseFloat(garaje.precio_dia);
+        } else if (garaje.precio_hora) {
             subtotal = parseFloat(garaje.precio_hora) * horas;
+            tipo_cobro = "POR_HORA";
         } else if (garaje.precio_dia) {
             subtotal = parseFloat(garaje.precio_dia);
             tipo_cobro = "POR_DIA";

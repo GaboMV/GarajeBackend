@@ -64,6 +64,9 @@ model Garaje {
   esta_aprobado       Boolean   @default(false)
   documento_propiedad_url String? // KEY del archivo en el bucket privado
   
+  hora_inicio_jornada  String    @default("08:00")
+  hora_fin_jornada     String    @default("20:00")
+  
   fecha_creacion      DateTime  @default(now())
   fecha_actualizacion DateTime  @updatedAt
 
