@@ -12,7 +12,8 @@ const createGaraje = async (req, res, next) => {
             nombre, descripcion, direccion,
             latitud, longitud, precio_hora, precio_dia,
             minimo_horas, tiempo_limpieza,
-            tiene_wifi, tiene_bano, tiene_electricidad, tiene_mesa
+            tiene_wifi, tiene_bano, tiene_electricidad, tiene_mesa,
+            servicios_extra
         } = req.body;
 
         // Capturar coordenadas de varias posibles fuentes (latitud/longitud o lat/lng)
@@ -113,6 +114,25 @@ const createGaraje = async (req, res, next) => {
                 SET ubicacion_geo = ST_SetSRID(ST_MakePoint(${parseFloat(lng)}, ${parseFloat(lat)}), 4326) 
                 WHERE id = ${nuevoGaraje.id}
             `;
+        }
+
+        // Agregar servicios extra si vienen en la petición
+        if (servicios_extra && typeof servicios_extra === 'string') {
+            const serviciosArray = servicios_extra.split(',').map(s => {
+                const parts = s.split(':');
+                return {
+                    id_garaje: nuevoGaraje.id,
+                    nombre: parts[0],
+                    precio: parseFloat(parts[1] || '0')
+                };
+            });
+
+            if (serviciosArray.length > 0) {
+                await prisma.servicioAdicional.createMany({
+                    data: serviciosArray
+                });
+                console.log("Servicios adicionales registrados:", serviciosArray.length);
+            }
         }
 
         res.status(201).json({
