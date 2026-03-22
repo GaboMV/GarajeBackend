@@ -179,6 +179,14 @@ const approveUser = async (req, res, next) => {
                 userId: idUsuario
             });
         }
+        
+        await prisma.notificacion.create({
+            data: {
+                id_usuario: idUsuario,
+                titulo: 'KYC Aprobado',
+                cuerpo: '¡Tu cuenta ha sido verificada! Ya puedes publicar garajes y hacer reservas.'
+            }
+        });
 
         res.json({
             message: 'Usuario aprobado exitosamente. Ya puede operar en la app.',

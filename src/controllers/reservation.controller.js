@@ -172,6 +172,14 @@ const createReservation = async (req, res, next) => {
             });
         }
 
+        await prisma.notificacion.create({
+            data: {
+                id_usuario: garaje.id_dueno,
+                titulo: 'Nueva Solicitud de Reserva',
+                cuerpo: `¡Tienes una nueva solicitud de reserva para ${garaje.nombre}!`
+            }
+        });
+
     } catch (error) {
         next(error);
     }

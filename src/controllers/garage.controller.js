@@ -461,6 +461,16 @@ const approveGarage = async (req, res, next) => {
             });
         }
 
+        if (garage.id_dueno) {
+            await prisma.notificacion.create({
+                data: {
+                    id_usuario: garage.id_dueno,
+                    titulo: 'Garaje Aprobado',
+                    cuerpo: `¡Tu espacio "${garage.nombre}" ha sido aprobado y ya está visible para reservas!`
+                }
+            });
+        }
+
         res.json({ message: 'Garaje aprobado con éxito', garage: approvedGarage });
     } catch (error) {
         next(error);
