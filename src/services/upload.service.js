@@ -38,14 +38,11 @@ const uploadFilePublic = async (file, folder = 'general') => {
     await s3Client.send(command);
 
     // Limpiar R2_PUBLIC_URL de posibles barras diagonales al final
-    const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
-    const publicUrlBase = R2_PUBLIC_URL ? R2_PUBLIC_URL.replace(/\/+$/, '') : null;
+    // Agregamos un fallback harcodeado por si no se cargó la variable en Render
+    const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || 'https://pub-ea90bddb9761482cada6720de6b9e634.r2.dev';
+    const publicUrlBase = R2_PUBLIC_URL.replace(/\/+$/, '');
 
-    if (publicUrlBase) {
-        return `${publicUrlBase}/${fileName}`;
-    }
-
-    return `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${BUCKET_PUBLIC}/${fileName}`;
+    return `${publicUrlBase}/${fileName}`;
 };
 
 /**
