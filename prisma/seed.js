@@ -140,10 +140,10 @@ async function main() {
     }
 
     console.log('5. Creando horarios default...');
-    // Abrir de Lunes a Viernes de 8am a 8pm para todos
+    // Abrir de Lunes a Domingo de 8am a 10pm para todos
     const ids = [g1.id, g2.id, g3.id];
     for (const gid of ids) {
-        for (let i = 1; i <= 5; i++) {
+        for (let i = 0; i <= 6; i++) {
             await prisma.horarioSemanal.create({
                 data: {
                     id_garaje: gid,

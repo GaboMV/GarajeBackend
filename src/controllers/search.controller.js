@@ -70,10 +70,18 @@ const searchGarajes = async (req, res, next) => {
             const dayOfWeek = searchDate.getDay(); // 0 (Dom) a 6 (Sab)
             
             const horarioHoy = garaje.horarios_semanales.find(h => h.dia_semana === dayOfWeek);
-            if (!horarioHoy || !horarioHoy.abierto) return false;
+            
+            // Si el garaje TIENE horarios cargados pero ninguno coincide con hoy, o dice que está cerrado, lo filtramos.
+            // SI NO TIENE horarios cargados (lista vacía), lo mostramos por defecto (se asume abierto).
+            if (garaje.horarios_semanales.length > 0) {
+                if (!horarioHoy || !horarioHoy.abierto) return false;
 
-            if (searchHoraInicio < horarioHoy.hora_inicio || searchHoraFin > horarioHoy.hora_fin) {
-                return false;
+                // Si el usuario especificó HORAS, verificamos que el garaje esté abierto en ese rango
+                if (hora_inicio && hora_fin) {
+                    if (searchHoraInicio < horarioHoy.hora_inicio || searchHoraFin > horarioHoy.hora_fin) {
+                        return false;
+                    }
+                }
             }
 
             const estaBloqueada = garaje.fechas_bloqueadas.some(fb =>
