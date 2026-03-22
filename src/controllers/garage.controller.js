@@ -1,5 +1,5 @@
 const prisma = require('../db/prisma');
-const { uploadFilePublic, uploadFilePrivate, getDynamicPresignedUrl } = require('../services/upload.service');
+const { uploadFilePublic, uploadFilePrivate, deleteFilePublic, deleteFilePrivate, getDynamicPresignedUrl } = require('../services/upload.service');
 
 /**
  * 1. Crear un nuevo Garaje
