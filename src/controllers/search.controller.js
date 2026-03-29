@@ -1,28 +1,29 @@
 const prisma = require('../db/prisma');
+const logger = require('../utils/logger');
 
 /**
- * 1. Motor de Búsqueda de Garajes
- * El vendedor busca un garaje pasándole Fecha, Hora Inicio y Hora Fin.
+ * Motor de exploración espacial y temporal para la ubicación de establecimientos comerciales disponibles.
+ * Emplea PostGIS para acotamiento radial y filtros paramétricos para rangos de horarios libres.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const searchGarajes = async (req, res, next) => {
     try {
         const { fecha, hora_inicio, hora_fin, lat, lng, radio_km } = req.query;
         
-        // Los filtros de tiempo se activan si hay fecha (las horas son opcionales)
         const hasDateFilter = !!fecha;
         const searchHoraInicio = hora_inicio || '00:00';
         const searchHoraFin = hora_fin || '23:59';
 
-        // Preparar filtro base
         let whereFiltro = {
-            esta_aprobado: true // Solo buscar garajes aprobados por un admin
+            esta_aprobado: true
         };
 
-        // Filtrado espacial usando PostGIS si hay coordenadas
         if (lat && lng) {
-            const radio = radio_km ? parseFloat(radio_km) * 1000 : 5000; // Por defecto 5km (5000 metros)
+            const radio = radio_km ? parseFloat(radio_km) * 1000 : 5000;
             
-            // Consultar IDs que están dentro del radio
             const cercanosRaw = await prisma.$queryRaw`
                 SELECT id FROM "Garaje"
                 WHERE "ubicacion_geo" IS NOT NULL AND ST_DWithin(
@@ -36,21 +37,14 @@ const searchGarajes = async (req, res, next) => {
             whereFiltro.id = { in: idsCercanos };
         }
 
-        // Traer todos los garajes que potencialmente sirvan
         const garajes = await prisma.garaje.findMany({
             where: whereFiltro,
             include: {
                 horarios_semanales: true,
                 fechas_bloqueadas: true,
                 reservas: {
-                    include: {
-                        fechas: true
-                    },
-                    where: {
-                        estado: {
-                            notIn: ['CANCELADA', 'REEMBOLSADA']
-                        }
-                    }
+                    include: { fechas: true },
+                    where: { estado: { notIn: ['CANCELADA', 'REEMBOLSADA'] } }
                 },
                 imagenes: true,
                 servicios_adicionales: true,
@@ -64,19 +58,15 @@ const searchGarajes = async (req, res, next) => {
             }
         });
 
-        // Aplicamos "La Matemática del Backend" (Filtro) SOLO SI hay parámetros de tiempo o fecha
         const garajesDisponibles = hasDateFilter ? garajes.filter(garaje => {
             const searchDate = new Date(fecha);
-            const dayOfWeek = searchDate.getDay(); // 0 (Dom) a 6 (Sab)
+            const dayOfWeek = searchDate.getDay();
             
             const horarioHoy = garaje.horarios_semanales.find(h => h.dia_semana === dayOfWeek);
             
-            // Si el garaje TIENE horarios cargados pero ninguno coincide con hoy, o dice que está cerrado, lo filtramos.
-            // SI NO TIENE horarios cargados (lista vacía), lo mostramos por defecto (se asume abierto).
             if (garaje.horarios_semanales.length > 0) {
                 if (!horarioHoy || !horarioHoy.abierto) return false;
 
-                // Si el usuario especificó HORAS, verificamos que el garaje esté abierto en ese rango
                 if (hora_inicio && hora_fin) {
                     if (searchHoraInicio < horarioHoy.hora_inicio || searchHoraFin > horarioHoy.hora_fin) {
                         return false;
@@ -121,19 +111,21 @@ const searchGarajes = async (req, res, next) => {
             return true;
         }) : garajes;
 
-        // Limpiamos los datos innecesarios de las respuestas antes de mandarlas
         const responseData = garajesDisponibles.map(g => {
             const { reservas, fechas_bloqueadas, horarios_semanales, ...cleanGaraje } = g;
             return cleanGaraje;
         });
 
+        logger.info('SearchController', `Barrido métrico retornado de manera exitosa. Elementos procesados útiles: ${responseData.length}`);
+
         res.json({
-            message: 'Búsqueda completada',
+            message: 'Análisis de disponibilidad culminado sistemáticamente',
             total_encontrados: responseData.length,
             garajes: responseData
         });
 
     } catch (error) {
+        logger.error('SearchController', 'Caída transaccional imprevista al iterar sub-condiciones geográficas', error);
         next(error);
     }
 }

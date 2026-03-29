@@ -1,19 +1,22 @@
 const prisma = require('../db/prisma');
+const logger = require('../utils/logger');
 
 /**
- * 1. Consultar Saldo (Dueño) y Analítica
- * Incluye Retenidos por reservas "EN_CURSO"
+ * Consulta referencial del balance contable estipulado a las carteras de un usuario específico.
+ * Agrupa los saldos activos e integra sumatorias retenidas de reservaciones provisionales.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const getBalance = async (req, res, next) => {
     try {
         const id_usuario = req.user.id;
 
-        // 1. Obtener billetera actual
         const billetera = await prisma.billetera.findUnique({
             where: { id_usuario }
         });
 
-        // 2. Calcular saldos retenidos en Reservas "EN_CURSO" y "PAGADAS" que aún no liberan el dinero
         const reservasRetenidas = await prisma.reserva.aggregate({
             _sum: {
                 monto_dueno: true
@@ -37,12 +40,17 @@ const getBalance = async (req, res, next) => {
             }
         });
     } catch (error) {
+        logger.error('FinanceController', 'Error durante la agresión matemática de proyecciones financieras', error);
         next(error);
     }
 }
 
 /**
- * 2. Solicitar Retiro de Fondos
+ * Instrumento para asentar la solicitud de reintegro en efectivo de saldos virtualizados.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const requestWithdrawal = async (req, res, next) => {
     try {
@@ -50,7 +58,7 @@ const requestWithdrawal = async (req, res, next) => {
         const { monto, banco_destino, cuenta_destino } = req.body;
 
         if (!monto || monto <= 0) {
-            return res.status(400).json({ error: 'Monto inválido' });
+            return res.status(400).json({ error: 'Denominación monetaria incompatible.' });
         }
 
         const billetera = await prisma.billetera.findUnique({
@@ -58,11 +66,10 @@ const requestWithdrawal = async (req, res, next) => {
         });
 
         if (!billetera || parseFloat(billetera.saldo_disponible) < parseFloat(monto)) {
-            return res.status(400).json({ error: 'Saldo disponible insuficiente' });
+            return res.status(400).json({ error: 'Carencia de fondos suficientes para atender esta detracción.' });
         }
 
         await prisma.$transaction(async (tx) => {
-            // Descontar saldo de la billetera temporalmente (o bloquearlo as "en transito" si tuvieramos ese estado)
             await tx.billetera.update({
                 where: { id: billetera.id },
                 data: {
@@ -70,7 +77,6 @@ const requestWithdrawal = async (req, res, next) => {
                 }
             });
 
-            // Registrar la solicitud
             await tx.solicitudRetiro.create({
                 data: {
                     id_usuario,
@@ -81,26 +87,32 @@ const requestWithdrawal = async (req, res, next) => {
                 }
             });
 
-            // Registrar movimiento de retiro
             await tx.movimientoBilletera.create({
                 data: {
                     id_billetera: billetera.id,
                     tipo: 'RETIRO',
                     monto,
-                    descripcion: 'Solicitud de retiro a cuenta bancaria.'
+                    descripcion: 'Emisión de petición formal orientada al flujo externo en el sistema bancario matriz.'
                 }
             });
         });
 
-        res.json({ message: 'Solicitud de retiro creada. El administrador procesará tu pago en breve.' });
+        logger.info('FinanceController', `Fórmula de retiro encolada originada por usuario: ${id_usuario}. Monto: ${monto}`);
+
+        res.json({ message: 'Tramitación recepcionada para revisión de área administrativa local.' });
 
     } catch (error) {
+        logger.error('FinanceController', 'Dificultades insalvables operando el drenaje sistemático hacia entidades terciarias.', error);
         next(error);
     }
 }
 
 /**
- * 3. Aprobar Retiro (Admin)
+ * Procedimiento reservado para la liberación ejecutiva de fondos mediante auditoría externa (Admin).
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const approveWithdrawal = async (req, res, next) => {
     try {
@@ -110,7 +122,7 @@ const approveWithdrawal = async (req, res, next) => {
         const solicitud = await prisma.solicitudRetiro.findUnique({ where: { id: idSolicitud } });
 
         if (!solicitud || solicitud.estado !== 'PENDIENTE') {
-            return res.status(400).json({ error: 'Solicitud no encontrada o ya procesada.' });
+            return res.status(400).json({ error: 'El expediente de abono excede sus atribuciones procesales o ya cursó salida.' });
         }
 
         await prisma.solicitudRetiro.update({
@@ -122,8 +134,11 @@ const approveWithdrawal = async (req, res, next) => {
             }
         });
 
-        res.json({ message: 'Retiro procesado correctamente.' });
+        logger.info('FinanceController', `Egreso procesado efectivamente y cerrado a nivel transaccional. ID Solicitud: ${idSolicitud}`);
+
+        res.json({ message: 'Canalización completada. Transferencia ratificada en subsistema logístico central.' });
     } catch (error) {
+        logger.error('FinanceController', 'Caída al aplicar estatus definitivo sobre la emisión contable subordinada', error);
         next(error);
     }
 }

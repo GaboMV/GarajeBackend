@@ -1,8 +1,12 @@
 const prisma = require('../db/prisma');
+const logger = require('../utils/logger');
 
 /**
- * Obtener las notificaciones del usuario autenticado.
- * GET /api/notifications
+ * Extracción de incidencias notificativas directas dependientes del portador del token.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const getMyNotifications = async (req, res, next) => {
     try {
@@ -12,7 +16,6 @@ const getMyNotifications = async (req, res, next) => {
             orderBy: { fecha_creacion: 'desc' }
         });
 
-        // Contar las no leídas
         const unreadCount = await prisma.notificacion.count({
             where: { id_usuario, leido: false }
         });
@@ -22,23 +25,26 @@ const getMyNotifications = async (req, res, next) => {
             unreadCount
         });
     } catch (error) {
+        logger.error('NotificationController', 'Falla técnica bloqueando la compilación de eventos de aviso orientativos', error);
         next(error);
     }
 }
 
 /**
- * Marcar una notificación como leída.
- * PUT /api/notifications/:id/read
+ * Neutralización analítica (marcado como leída) sobre una tupla específica de notificaciones.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const markAsRead = async (req, res, next) => {
     try {
         const { id } = req.params;
         const id_usuario = req.user.id;
 
-        // Validar propiedad
         const notificacion = await prisma.notificacion.findUnique({ where: { id } });
         if (!notificacion || notificacion.id_usuario !== id_usuario) {
-            return res.status(403).json({ error: 'Notificación no encontrada o sin permisos' });
+            return res.status(403).json({ error: 'Rechazo estructural. No es viable accesar apuntadores ajenos o inválidos.' });
         }
 
         const actualizada = await prisma.notificacion.update({
@@ -46,15 +52,21 @@ const markAsRead = async (req, res, next) => {
             data: { leido: true }
         });
 
-        res.json({ message: 'Notificación leída', notificacion: actualizada });
+        logger.info('NotificationController', `Cambio de estatus (bandera leída) ejecutado en puntero ID: ${id}`);
+
+        res.json({ message: 'Convalidación del consumo de la notificación ejecutado sistemáticamente', notificacion: actualizada });
     } catch (error) {
+        logger.error('NotificationController', 'Interrupción severa al intentar actualizar estado booleano de la notificación visual', error);
         next(error);
     }
 }
 
 /**
- * Marcar TODAS las notificaciones del usuario como leídas.
- * PUT /api/notifications/read-all
+ * Operación unificada para convalidar en bloque todos los remanentes visuales no atendidos (marcar todas como leídas).
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const markAllAsRead = async (req, res, next) => {
     try {
@@ -65,8 +77,11 @@ const markAllAsRead = async (req, res, next) => {
             data: { leido: true }
         });
 
-        res.json({ message: 'Todas las notificaciones marcadas como leídas' });
+        logger.info('NotificationController', `Purga masiva de banderas flotantes en UI realizada para el usuario: ${id_usuario}`);
+
+        res.json({ message: 'Depuración integral en cola de lectura completada.' });
     } catch (error) {
+        logger.error('NotificationController', 'Catástrofe de concurrencias operando depurador multi-tupla sobre notificaciones', error);
         next(error);
     }
 }

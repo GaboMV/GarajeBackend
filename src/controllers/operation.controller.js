@@ -1,8 +1,13 @@
 const prisma = require('../db/prisma');
+const logger = require('../utils/logger');
 
 /**
- * 1. Check-In "Blindado"
- * El Vendedor llega y toma foto de cómo está el garaje.
+ * Registra formalmente la llegada del arrendatario al establecimiento (Check-In).
+ * Requiere captura de evidencia fotográfica del estado inicial del inmueble.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const checkIn = async (req, res, next) => {
     try {
@@ -16,20 +21,19 @@ const checkIn = async (req, res, next) => {
         });
 
         if (!reserva || reserva.id_vendedor !== id_vendedor) {
-            return res.status(403).json({ error: 'Reserva no encontrada o no tienes permisos' });
+            return res.status(403).json({ error: 'Reserva no encontrada o no posee los permisos requeridos.' });
         }
 
         if (reserva.estado !== 'PAGADA' && reserva.estado !== 'EN_CURSO') {
-            return res.status(400).json({ error: 'No puedes hacer check-in. La reserva no ha sido pagada.' });
+            return res.status(400).json({ error: 'Operación denegada. La reserva no presenta estado de pago validado.' });
         }
 
         const fechaReserva = reserva.fechas.find(fr => fr.id === id_fecha_reserva);
         if (!fechaReserva) {
-            return res.status(404).json({ error: 'Fecha de reserva no encontrada' });
+            return res.status(404).json({ error: 'La fecha de reserva especificada no existe en el sistema.' });
         }
 
         await prisma.$transaction(async (tx) => {
-            // Guardar evidencia fotográfica
             await tx.evidenciaReserva.create({
                 data: {
                     id_fecha_reserva,
@@ -39,7 +43,6 @@ const checkIn = async (req, res, next) => {
                 }
             });
 
-            // Actualizar status del día
             await tx.fechaReserva.update({
                 where: { id: id_fecha_reserva },
                 data: {
@@ -48,7 +51,6 @@ const checkIn = async (req, res, next) => {
                 }
             });
 
-            // Actualizar status general de la reserva
             if (reserva.estado !== 'EN_CURSO') {
                 await tx.reserva.update({
                     where: { id: idReserva },
@@ -57,17 +59,23 @@ const checkIn = async (req, res, next) => {
             }
         });
 
-        res.json({ message: 'Check-in registrado de forma segura. El dueño fue notificado.' });
+        logger.info('OperationController', `Check-In registrado exitosamente para la reserva: ${idReserva}`);
+
+        res.json({ message: 'Procedimiento inicial registrado satisfactoriamente. El reporte fue documentado.' });
 
     } catch (error) {
+        logger.error('OperationController', 'Error durante el procedimiento de Check-In.', error);
         next(error);
     }
 }
 
 /**
- * 2. Check-Out "Blindado" y Liberación de Fondos
- * El Vendedor se va, sube foto de limpieza, la reserva se marca como COMPLETADA.
- * Los fondos del dueño se mueven de "Retenidos" a "Disponibles".
+ * Registra la salida del arrendatario y ejecuta la liberación condicionada de fondos retenidos (Check-Out).
+ * Transfiere los fondos de estado 'Retenido' a 'Disponible' en la billetera del arrendador.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const checkOut = async (req, res, next) => {
     try {
@@ -84,21 +92,19 @@ const checkOut = async (req, res, next) => {
         });
 
         if (!reserva || reserva.id_vendedor !== id_vendedor) {
-            return res.status(403).json({ error: 'Reserva no encontrada o no tienes permisos' });
+            return res.status(403).json({ error: 'Reserva no encontrada o no posee los permisos requeridos.' });
         }
 
         const fechaReserva = reserva.fechas.find(fr => fr.id === id_fecha_reserva);
         if (!fechaReserva) {
-            return res.status(404).json({ error: 'Fecha de reserva no encontrada' });
+            return res.status(404).json({ error: 'La fecha de reserva especificada no existe en el sistema.' });
         }
 
         if (fechaReserva.estado !== 'EN_CURSO') {
-            return res.status(400).json({ error: 'No puedes hacer check-out si no hiciste check-in.' });
+            return res.status(400).json({ error: 'No es posible validar la salida sin un ingreso (Check-In) previamente documentado.' });
         }
 
-        // Ejecutar Flujo Transaccional CRÍTICO (Escrow Cash-Out)
         await prisma.$transaction(async (tx) => {
-            // 1. Guardar la evidencia fotográfica de salida
             await tx.evidenciaReserva.create({
                 data: {
                     id_fecha_reserva,
@@ -108,7 +114,6 @@ const checkOut = async (req, res, next) => {
                 }
             });
 
-            // 2. Marcar día(FechaReserva) como completado
             await tx.fechaReserva.update({
                 where: { id: id_fecha_reserva },
                 data: {
@@ -117,21 +122,16 @@ const checkOut = async (req, res, next) => {
                 }
             });
 
-            // Consideraremos la RESERVA entera como completada para el MVP.
-            // Si la reserva tiene varías fechas, la lógica real debería verificar que 
-            // no queden días EN_CURSO ni PROGRAMADOS antes de liberar fondos globales.
             const todasCompletadas = reserva.fechas.every(fr =>
                 fr.id === id_fecha_reserva || fr.estado === 'COMPLETADA'
             );
 
             if (todasCompletadas) {
-                // 3. Marcar Reserva como COMPLETADA
                 await tx.reserva.update({
                     where: { id: idReserva },
                     data: { estado: 'COMPLETADA' }
                 });
 
-                // 4. Liberar los fondos al dueño
                 const billeteraDueno = await tx.billetera.findUnique({
                     where: { id_usuario: reserva.garaje.id_dueno }
                 });
@@ -145,25 +145,25 @@ const checkOut = async (req, res, next) => {
                         }
                     });
 
-                    // Registrar Movimiento Billetera (Liberación)
                     await tx.movimientoBilletera.create({
                         data: {
                             id_billetera: billeteraDueno.id,
                             id_reserva: idReserva,
                             tipo: 'LIBERACION',
                             monto: reserva.monto_dueno,
-                            descripcion: `Fondos liberados por Check-out Reserva #${reserva.id.split('-')[0]}.`
+                            descripcion: `Fondos liberados correspondientes a la finalización de la Reserva #${reserva.id.split('-')[0]}.`
                         }
                     });
-
-                    // (Opcional MVP) Mover tu ganancia (comision_app) a tu billetera Admin
                 }
             }
         });
 
-        res.json({ message: 'Check-out completado exitosamente. Los fondos han sido liberados y procesados.' });
+        logger.info('OperationController', `Check-Out y liquidación de fondos completados para la reserva: ${idReserva}`);
+
+        res.json({ message: 'Procedimiento de salida completado. Los fondos han sido liberados de acuerdo a las directrices de custodia.' });
 
     } catch (error) {
+        logger.error('OperationController', 'Excepción crítica generada durante la estructura transaccional de Check-Out.', error);
         next(error);
     }
 }

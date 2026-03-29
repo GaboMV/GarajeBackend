@@ -3,6 +3,7 @@ const http = require('http');
 const app = require('./app');
 const prisma = require('./db/prisma');
 const { initSocketGateway } = require('./socket/chat.gateway');
+const logger = require('./utils/logger');
 
 const PORT = process.env.PORT || 3000;
 
@@ -16,14 +17,14 @@ app.set('socketio', io);
 async function main() {
     try {
         await prisma.$connect();
-        console.log('✅ Connected to database successfully');
+        logger.info('System', 'Conexión a la base de datos establecida exitosamente.');
 
         httpServer.listen(PORT, () => {
-            console.log(`🚀 Server is running on port ${PORT}`);
-            console.log(`💬 Socket.io Chat Gateway active`);
+            logger.info('System', `Servidor en ejecución sobre el puerto ${PORT}`);
+            logger.info('System', 'Gateway de Socket.io Chat inicializado y activo');
         });
     } catch (error) {
-        console.error('❌ Failed to connect to the database', error);
+        logger.error('System', 'Fallo al intentar establecer conexión con la base de datos', error);
         process.exit(1);
     }
 }
@@ -33,7 +34,6 @@ main();
 // Handle termination gracefully
 process.on('SIGINT', async () => {
     await prisma.$disconnect();
-    console.log('Prisma disconnected on app termination');
+    logger.info('System', 'Conexión a Prisma finalizada por cierre de aplicación.');
     process.exit(0);
 });
-

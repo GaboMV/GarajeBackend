@@ -1,9 +1,13 @@
 const prisma = require('../db/prisma');
+const logger = require('../utils/logger');
 
 /**
- * 1. Botón de Pánico / Crear Ticket de Disputa
- * El vendedor o dueño reportan un problema durante la reserva.
- * La Plataforma congela los fondos.
+ * Reporte sistemático de incidentes operativos o fallas transaccionales durante la ejecución de una reserva.
+ * Provoca el bloqueo transitorio de fondos y la inmovilización del flujo normal del contrato.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const reportIssue = async (req, res, next) => {
     try {
@@ -16,13 +20,11 @@ const reportIssue = async (req, res, next) => {
             include: { garaje: true }
         });
 
-        // Validar que participa en la reserva
         if (!reserva || (reserva.id_vendedor !== id_reportador && reserva.garaje.id_dueno !== id_reportador)) {
-            return res.status(403).json({ error: 'Reserva no encontrada o no tienes permisos' });
+            return res.status(403).json({ error: 'Condición simétrica denegada. Su perfil no interviene en la reserva afectada.' });
         }
 
         await prisma.$transaction(async (tx) => {
-            // 1. Crear el ticket
             await tx.ticketSoporte.create({
                 data: {
                     id_reserva: idReserva,
@@ -33,32 +35,36 @@ const reportIssue = async (req, res, next) => {
                 }
             });
 
-            // 2. Cambiar reserva a EN_DISPUTA (Congela la operación normal)
             await tx.reserva.update({
                 where: { id: idReserva },
                 data: { estado: 'EN_DISPUTA' }
             });
-
-            // Los fondos del dueño se mantienen en "saldo_retenido", no se liberan.
         });
 
+        logger.info('SupportController', `Alerta de sistema (Soporte) emitida por usuario: ${id_reportador}. Reserva congelada: ${idReserva}`);
+
         res.status(201).json({
-            message: 'Ticket creado. La reserva se ha puesto en disputa y los fondos están congelados. Nuestro equipo analizará el caso.'
+            message: 'Incidencia técnica y legal reportada. El activo subyacente entra en suspensión y los saldos quedan retenidos preventivamente.'
         });
 
     } catch (error) {
+        logger.error('SupportController', 'Error crítico al instaurar variables de litigio', error);
         next(error);
     }
 }
 
 /**
- * 2. Cierre de Ticket (Admin)
- * El administrador (tú) le das la razón a alguna de las partes.
+ * Veredicto administrativo resolutorio a una disputa abierta. 
+ * Finaliza el conflicto financiero y redirecciona los fondos en custodia hacia una de las partes.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const resolveTicket = async (req, res, next) => {
     try {
         const { idTicket } = req.params;
-        const { decision } = req.body; // 'CERRADO_A_FAVOR_VENDEDOR' o 'CERRADO_A_FAVOR_DUENO'
+        const { decision } = req.body;
 
         const ticket = await prisma.ticketSoporte.findUnique({
             where: { id: idTicket },
@@ -68,22 +74,20 @@ const resolveTicket = async (req, res, next) => {
         });
 
         if (!ticket || ticket.estado !== 'ABIERTO') {
-            return res.status(400).json({ error: 'Ticket no válido o ya cerrado' });
+            return res.status(400).json({ error: 'Expediente no localizable o previamente sentenciado.' });
         }
 
         await prisma.$transaction(async (tx) => {
-            // 1. Cerrar Ticket
             await tx.ticketSoporte.update({
                 where: { id: idTicket },
                 data: {
                     estado: decision,
-                    resolucion_admin: `Decisión manual por Admin`,
+                    resolucion_admin: `Fallo y ejecución administrativa emitida manualmente.`,
                     fecha_cierre: new Date()
                 }
             });
 
             if (decision === 'CERRADO_A_FAVOR_VENDEDOR') {
-                // El Vendedor tenía razón (Ej. el lugar estaba cerrado). Se le reembolsa el total.
                 await tx.reserva.update({
                     where: { id: ticket.id_reserva },
                     data: { estado: 'REEMBOLSADA' }
@@ -94,16 +98,14 @@ const resolveTicket = async (req, res, next) => {
                 });
 
                 if (billeteraDueno) {
-                    // Descontar la retención del dueño, no recibirá el dinero.
                     await tx.billetera.update({
                         where: { id: billeteraDueno.id },
                         data: { saldo_retenido: { decrement: ticket.reserva.monto_dueno } }
                     });
                 }
 
-                // (Opcional) Guardar registro de que App debe Reembolsar manualmente al medio bancario del vendedor.
+                logger.info('SupportController', `Veredicto de reembolso emitido sobre el ticket: ${idTicket}`);
             } else if (decision === 'CERRADO_A_FAVOR_DUENO') {
-                // El Dueño tenía razón. (Ej. el vendedor dañó algo). El dueño se queda el pago.
                 await tx.reserva.update({
                     where: { id: ticket.id_reserva },
                     data: { estado: 'COMPLETADA' }
@@ -114,7 +116,6 @@ const resolveTicket = async (req, res, next) => {
                 });
 
                 if (billeteraDueno) {
-                    // Mover retención a disponible
                     await tx.billetera.update({
                         where: { id: billeteraDueno.id },
                         data: {
@@ -123,29 +124,34 @@ const resolveTicket = async (req, res, next) => {
                         }
                     });
                 }
+                
+                logger.info('SupportController', `Veredicto de retención consolidada emitido sobre el ticket: ${idTicket}`);
             }
         });
 
-        res.json({ message: `Disputa resuelta: ${decision}` });
+        res.json({ message: `Diligencia de soporte dictaminada bajo cláusula: ${decision}` });
 
     } catch (error) {
+        logger.error('SupportController', 'Colapso sistémico procesando mitigación de conflicto financiero.', error);
         next(error);
     }
 }
 
 /**
- * 3. Dejar Calificación 
- * Al completarse la reserva, ambas partes se califican.
+ * Evaluación métrica de la interacción contractual (Calificación Par a Par).
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const rateExperience = async (req, res, next) => {
     try {
         const id_autor = req.user.id;
         const { idReserva } = req.params;
         const { id_objetivo, tipo_objetivo, puntuacion, comentario } = req.body;
-        // tipo_objetivo: USUARIO (Vendedor) o GARAJE (Dueño)
 
         if (puntuacion < 1 || puntuacion > 5) {
-            return res.status(400).json({ error: 'La puntuación debe ser entre 1 y 5' });
+            return res.status(400).json({ error: 'La escala de cuantificación estricta debe circunscribirse entre valores enteros de 1 al 5.' });
         }
 
         const reserva = await prisma.reserva.findUnique({
@@ -153,7 +159,7 @@ const rateExperience = async (req, res, next) => {
         });
 
         if (!reserva || reserva.estado !== 'COMPLETADA') {
-            return res.status(400).json({ error: 'Solo puedes calificar reservas COMPLETADAS' });
+            return res.status(400).json({ error: 'Evaluación asincrónica no permitida en estadios de reserva inconclusos.' });
         }
 
         const calificacion = await prisma.calificacion.create({
@@ -167,9 +173,12 @@ const rateExperience = async (req, res, next) => {
             }
         });
 
-        res.status(201).json({ message: 'Calificación registrada', calificacion });
+        logger.info('SupportController', `Atribución cuantitativa inyectada exitosamente para la reserva: ${idReserva}`);
+
+        res.status(201).json({ message: 'Índices descriptivos de servicio adjuntados satisfactoriamente en los repositorios centrales.', calificacion });
 
     } catch (error) {
+        logger.error('SupportController', 'Error impidiendo estabilización de metadata descriptiva (Rating)', error);
         next(error);
     }
 }

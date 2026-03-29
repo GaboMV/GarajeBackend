@@ -2,8 +2,8 @@ const { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } = re
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const path = require('path');
 const crypto = require('crypto');
+const logger = require('../utils/logger');
 
-// Inicializar cliente S3 para Cloudflare R2
 const s3Client = new S3Client({
     region: 'auto',
     endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -17,8 +17,11 @@ const BUCKET_PUBLIC = process.env.R2_BUCKET_PUBLIC || 'garajes-public';
 const BUCKET_PRIVATE = process.env.R2_BUCKET_PRIVATE || 'garajes-kyc';
 
 /**
- * 1. Subida a bucket PÚBLICO (Garajes)
- * Retorna URL completa accesible por todos.
+ * Ejecuta la transferencia de flujo de bytes orientados a buckets de dominio público (Public).
+ * 
+ * @param {Object} file - Estructura estandarizada Multer (File).
+ * @param {string} folder - Estructura organizativa base (prefijo).
+ * @returns {Promise<string|null>} Ruta URI absoluta del recurso expuesto públicamente.
  */
 const uploadFilePublic = async (file, folder = 'general') => {
     if (!file) return null;
@@ -35,19 +38,26 @@ const uploadFilePublic = async (file, folder = 'general') => {
         ContentType: file.mimetype,
     });
 
-    await s3Client.send(command);
+    try {
+        await s3Client.send(command);
+        
+        const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || 'https://pub-ea90bddb9761482cada6720de6b9e634.r2.dev';
+        const publicUrlBase = R2_PUBLIC_URL.replace(/\/+$/, '');
 
-    // Limpiar R2_PUBLIC_URL de posibles barras diagonales al final
-    // Agregamos un fallback harcodeado por si no se cargó la variable en Render
-    const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || 'https://pub-ea90bddb9761482cada6720de6b9e634.r2.dev';
-    const publicUrlBase = R2_PUBLIC_URL.replace(/\/+$/, '');
-
-    return `${publicUrlBase}/${fileName}`;
+        logger.info('UploadService', `Inyección de objeto público materializada satisfactoriamente. Key asociada: ${fileName}`);
+        return `${publicUrlBase}/${fileName}`;
+    } catch (error) {
+        logger.error('UploadService', 'Inviabilidad de inyección binaria sobre R2 Público', error);
+        throw error;
+    }
 };
 
 /**
- * 2. Subida a bucket PRIVADO (KYC - Carnets/Selfies)
- * Retorna solo la KEY del objeto, ya que no hay URL pública.
+ * Traslada elementos probatorios al segmento privado y reservado de la integración S3 (Private).
+ * 
+ * @param {Object} file - Estructura estandarizada Multer (File).
+ * @param {string} folder - Prefijo de clasificación interna.
+ * @returns {Promise<string|null>} Referencia lógica privada (Key).
  */
 const uploadFilePrivate = async (file, folder = 'general') => {
     if (!file) return null;
@@ -62,32 +72,44 @@ const uploadFilePrivate = async (file, folder = 'general') => {
         ContentType: file.mimetype,
     });
 
-    await s3Client.send(command);
-
-    // Guardamos solo el ID (key) en la BD, no una URL completa.
-    return fileName;
+    try {
+        await s3Client.send(command);
+        logger.info('UploadService', `Archivado interno consumado en segmento privativo S3. Key asociada: ${fileName}`);
+        return fileName;
+    } catch (error) {
+        logger.error('UploadService', 'Interrupción fatal en tránsito documental KYC haca el bucket cerrado', error);
+        throw error;
+    }
 };
 
 /**
- * 3. Obtener URL Firmada del bucket privado (Expira en 5 minutos)
- * Esto lo usará el controlador cuando el Admin quiera ver los documentos KYC.
+ * Ensambla una URL firmada dinámicamente sobre la cual recae vigencia criptográfica limitada (5m).
+ * Utilizado por paneles de supervisión administrativa.
+ * 
+ * @param {string} key - Identificador interno del objeto.
+ * @returns {Promise<string|null>} Enlace presigned de disponibilidad acotada.
  */
 const getDynamicPresignedUrl = async (key) => {
     if (!key) return null;
 
-    // Generar URL firmada solo lectura para la app o el panel Admin
     const command = new GetObjectCommand({
         Bucket: BUCKET_PRIVATE,
         Key: key,
     });
 
-    // 300 segundos = 5 minutos de validez
-    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
-    return signedUrl;
+    try {
+        const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+        return signedUrl;
+    } catch (error) {
+        logger.error('UploadService', `Generación imposibilitada para firma asincrónica sobre clave S3: ${key}`, error);
+        throw error;
+    }
 };
 
 /**
- * 4. Eliminar archivo (Bucket Público, usado en Garajes)
+ * Ejecuta destrucción lógica permanente de un objeto contenido en almacenamiento público.
+ * 
+ * @param {string} fileUrl - URI del objeto pasible de purga.
  */
 const deleteFilePublic = async (fileUrl) => {
     try {
@@ -110,45 +132,59 @@ const deleteFilePublic = async (fileUrl) => {
         });
 
         await s3Client.send(command);
+        logger.info('UploadService', `Destrucción consumada en cuadrante público. Key borrada: ${keyText}`);
     } catch (error) {
-        console.error("Error al eliminar el archivo de R2 Público:", error);
+        logger.error("UploadService", "Fallo inherente a la ordenanza de barrido sobre R2 Público", error);
     }
 }
 
 /**
- * 5. Generar URL pre-firmada para SUBIDA de adjunto del Chat al bucket PRIVADO
- * El cliente hace PUT con esta URL directo a R2 PRIVADO (sin URL pública permanente).
- * Luego guarda la KEY (no la URL) y la usa para pedir acceso temporal.
+ * Tramita un manifiesto (URL presigned) que reviste permisos asimétricos para la inyección (PUT) directa por parte del cliente.
+ * 
+ * @param {string} fileName - Disposición del archivo en bucket.
+ * @param {string} contentType - Tipo nativo de contenido MIME.
+ * @returns {Promise<Object>} URL y Key mapeada.
  */
 const getPresignedUploadUrl = async (fileName, contentType) => {
-    const command = new PutObjectCommand({
-        Bucket: BUCKET_PRIVATE,  // ← PRIVADO, igual que el KYC
-        Key: fileName,
-        ContentType: contentType,
-    });
+    try {
+        const command = new PutObjectCommand({
+            Bucket: BUCKET_PRIVATE,
+            Key: fileName,
+            ContentType: contentType,
+        });
 
-    // La URL de subida expira en 5 minutos
-    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+        const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
 
-    // Solo retornamos la KEY del objeto, no una URL pública permanente
-    // Para leer la imagen después se genera una Presigned GET URL con getPresignedChatUrl
-    return { uploadUrl, key: fileName };
+        return { uploadUrl, key: fileName };
+    } catch (error) {
+        logger.error('UploadService', 'Fallo al despachar pasarela criptográfica POST hacia servidor S3 privativo', error);
+        throw error;
+    }
 };
 
 /**
- * 6. Generar URL de LECTURA temporal para un adjunto privado del Chat (5 minutos)
- * Idéntico al flujo de KYC. Solo el dueño/vendedor de la reserva puede pedirla.
+ * Equivalente transaccional que faculta la extracción temporal restringida a un anexo de red virtual (Chat).
+ * 
+ * @param {string} key - Identificador interno del objeto privado.
+ * @returns {Promise<string>} Enlace de recolección GET prefirmada.
  */
 const getPresignedChatUrl = async (key) => {
-    const command = new GetObjectCommand({
-        Bucket: BUCKET_PRIVATE,
-        Key: key,
-    });
-    return getSignedUrl(s3Client, command, { expiresIn: 300 });
+    try {
+        const command = new GetObjectCommand({
+            Bucket: BUCKET_PRIVATE,
+            Key: key,
+        });
+        return await getSignedUrl(s3Client, command, { expiresIn: 300 });
+    } catch (error) {
+        logger.error('UploadService', 'Falla de emisión para permiso eventual en nodo privado adjunto', error);
+        throw error;
+    }
 };
 
 /**
- * 7. Eliminar archivo PRIVADO (Usado al borrar garaje o cancelar KYC)
+ * Instrucción de alta jerarquía ordenando el vaciado terminal de información contenida bajo llave privativa.
+ * 
+ * @param {string} key - Clave del elemento objeto de baja.
  */
 const deleteFilePrivate = async (key) => {
     try {
@@ -160,8 +196,9 @@ const deleteFilePrivate = async (key) => {
         });
 
         await s3Client.send(command);
+        logger.info('UploadService', `Liquidación total verificada bajo sector privado (KYC/Files). Key extinguida: ${key}`);
     } catch (error) {
-        console.error("Error al eliminar el archivo de R2 Privado:", error);
+        logger.error("UploadService", "Rechazo del protocolo de purgado confidencial (R2 Privado)", error);
     }
 }
 

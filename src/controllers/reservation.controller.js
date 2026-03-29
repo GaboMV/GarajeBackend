@@ -1,9 +1,12 @@
 const prisma = require('../db/prisma');
+const logger = require('../utils/logger');
 
 /**
- * 1. Crear Reserva (Solicitud + Escudo Legal)
- * El Vendedor elige un garaje, fecha/hora y servicios.
- * Se calcula el precio total, comisión app y monto dueño.
+ * Crea una solicitud de reserva e inicializa las métricas computables contractuales.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const createReservation = async (req, res, next) => {
     try {
@@ -11,13 +14,13 @@ const createReservation = async (req, res, next) => {
         const {
             id_garaje, fecha, hora_inicio, hora_fin,
             mensaje_inicial, acepto_terminos_responsabilidad,
-            servicios_extra, // Array de objetos: [{ id_servicio, cantidad }]
-            categorias_venta, // Array de strings: ['Ropa', 'Juguetes']
+            servicios_extra,
+            categorias_venta,
             tipo_cobro: tipo_cobro_req
         } = req.body;
 
         if (!acepto_terminos_responsabilidad) {
-            return res.status(400).json({ error: 'Debes aceptar los términos de responsabilidad para reservar' });
+            return res.status(400).json({ error: 'La confirmación de las bases legales y de responsabilidad es excluyente.' });
         }
 
         const garaje = await prisma.garaje.findUnique({
@@ -32,10 +35,9 @@ const createReservation = async (req, res, next) => {
         });
 
         if (!garaje) {
-            return res.status(404).json({ error: 'Garaje no encontrado' });
+            return res.status(404).json({ error: 'El activo solicitado no se encuentra registrado en el sistema.' });
         }
 
-        // --- VALIDACIÓN DE CAPACIDAD MULTIVARIADA ---
         let reservasSolapadas = 0;
         const timeToMinutes = (timeStr) => {
             const [h, m] = timeStr.split(':').map(Number);
@@ -63,10 +65,9 @@ const createReservation = async (req, res, next) => {
         });
 
         if (reservasSolapadas >= garaje.capacidad_puestos) {
-            return res.status(400).json({ error: 'El garaje ha alcanzado su capacidad máxima para este horario.' });
+            return res.status(400).json({ error: 'El aforo disponible ha alcanzado el límite estructural para la banda horaria indicada.' });
         }
 
-        // --- CALCULO FINANCIERO SIMPLE ---
         const timeToDecimal = (t) => {
             const [h, m] = t.split(':').map(Number);
             return h + (m / 60);
@@ -74,7 +75,7 @@ const createReservation = async (req, res, next) => {
         const horas = timeToDecimal(hora_fin) - timeToDecimal(hora_inicio);
 
         if (horas < garaje.minimo_horas) {
-            return res.status(400).json({ error: `El mínimo de horas es ${garaje.minimo_horas}` });
+            return res.status(400).json({ error: `La ventana de tiempo elegida no satisface el mínimo estipulado (${garaje.minimo_horas} horas).` });
         }
 
         let subtotal = 0;
@@ -115,7 +116,6 @@ const createReservation = async (req, res, next) => {
         const monto_dueno = precio_total - comision_app;
 
         const nuevaReserva = await prisma.$transaction(async (tx) => {
-            // Resolver Categorias primero
             const categoriasReservaData = [];
             if (categorias_venta && Array.isArray(categorias_venta)) {
                 for (const catName of categorias_venta) {
@@ -174,8 +174,10 @@ const createReservation = async (req, res, next) => {
             return reserva;
         });
 
+        logger.info('ReservationController', `Contrato provisional estructurado. ID: ${nuevaReserva.id}`);
+
         res.status(201).json({
-            message: 'Reserva creada exitosamente',
+            message: 'Acuerdo inicial procesado con normalidad.',
             desglose: {
                 subtotal_horas: subtotal,
                 subtotal_servicios: totalServicios,
@@ -186,11 +188,10 @@ const createReservation = async (req, res, next) => {
             reserva: nuevaReserva
         });
 
-        // Emitir notificación al dueño del garaje
         const io = req.app.get('socketio');
         if (io) {
             io.to(garaje.id_dueno).emit('new_reservation_request', {
-                message: `¡Tienes una nueva solicitud de reserva para ${garaje.nombre}!`,
+                message: `Existen propuestas comerciales para el establecimiento referenciado como ${garaje.nombre}.`,
                 reservaId: nuevaReserva.id
             });
         }
@@ -198,20 +199,23 @@ const createReservation = async (req, res, next) => {
         await prisma.notificacion.create({
             data: {
                 id_usuario: garaje.id_dueno,
-                titulo: 'Nueva Solicitud de Reserva',
-                cuerpo: `¡Tienes una nueva solicitud de reserva para ${garaje.nombre}!`
+                titulo: 'Aviso Transaccional',
+                cuerpo: `Existen propuestas comerciales para el establecimiento referenciado como ${garaje.nombre}.`
             }
         });
 
     } catch (error) {
+        logger.error('ReservationController', 'Condición excepcional observada durante ensamblaje contractual.', error);
         next(error);
     }
 }
 
 /**
- * 2. Pagar Reserva y Subir Comprovante (FLUJO 4 - El Escrow)
- * El vendedor sube el comprobante. La reserva pasa a PAGADA
- * y el dinero del dueño pasa a 'Retenido' temporalmente.
+ * Reporte y confirmación de pago inicial. Bloquea formalmente los fondos provisionales retenidos.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const payReservation = async (req, res, next) => {
     try {
@@ -225,15 +229,14 @@ const payReservation = async (req, res, next) => {
         });
 
         if (!reserva || reserva.id_vendedor !== id_vendedor) {
-            return res.status(403).json({ error: 'Reserva no encontrada o no tienes permisos' });
+            return res.status(403).json({ error: 'Nivel jerárquico reprobado bajo este perfil transaccional.' });
         }
 
         if (reserva.estado !== 'ACEPTADA') {
-            return res.status(400).json({ error: 'La reserva debe estar ACEPTADA por el dueño antes de pagarla.' });
+            return res.status(400).json({ error: 'Es requisito primordial una autorización gerencial previa al aporte financiero.' });
         }
 
         await prisma.$transaction(async (tx) => {
-            // 1. Guardar Comprobante
             await tx.comprobantePago.create({
                 data: {
                     id_reserva: idReserva,
@@ -244,13 +247,11 @@ const payReservation = async (req, res, next) => {
                 }
             });
 
-            // 2. Actualizar Reserva a PAGADA
             await tx.reserva.update({
                 where: { id: idReserva },
                 data: { estado: 'PAGADA' }
             });
 
-            // 3. Crear Billetera del dueño si no tiene
             let billeteraDueno = await tx.billetera.findUnique({
                 where: { id_usuario: reserva.garaje.id_dueno }
             });
@@ -261,7 +262,6 @@ const payReservation = async (req, res, next) => {
                 });
             }
 
-            // 4. Retener el saldo del dueño (Monto va a Saldo Retenido)
             await tx.billetera.update({
                 where: { id: billeteraDueno.id },
                 data: {
@@ -271,30 +271,35 @@ const payReservation = async (req, res, next) => {
                 }
             });
 
-            // 5. Registrar Movimiento Billetera (Retención)
             await tx.movimientoBilletera.create({
                 data: {
                     id_billetera: billeteraDueno.id,
                     id_reserva: idReserva,
                     tipo: 'RETENCION',
                     monto: reserva.monto_dueno,
-                    descripcion: `Reserva #${reserva.id.split('-')[0]} Pagada. Fondos retenidos hasta Check-out.`
+                    descripcion: `Flujo ${reserva.id.split('-')[0]} completado. Capital inmovilizado y sujeto a auditorías finales.`
                 }
             });
         });
 
+        logger.info('ReservationController', `Liquidación del instrumento provisional avalada para la reserva ID: ${idReserva}`);
+
         res.json({
-            message: 'Pago reportado exitosamente. La reserva está confirmada y el horario asegurado.'
+            message: 'Inyección de capital comunicada exitosamente al marco administrativo local.'
         });
 
     } catch (error) {
+        logger.error('ReservationController', 'El protocolo financiero local desencadenó una divergencia crítica.', error);
         next(error);
     }
 }
 
 /**
- * 3. Get mis reservas (Vendedor / Cliente)
- * Lista todas las reservas que el usuario actual ha realizado.
+ * Retorna las vinculaciones históricas ejecutadas por el arrendatario actual.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const getMyReservations = async (req, res, next) => {
     try {
@@ -315,13 +320,17 @@ const getMyReservations = async (req, res, next) => {
 
         res.json({ reservas });
     } catch (error) {
+        logger.error('ReservationController', 'Errores esporádicos bloqueando subida analítica.', error);
         next(error);
     }
 }
 
 /**
- * 4. Get Reservas Recibidas (Dueño de Garaje)
- * Lista las reservas hechas hacia los garajes que posee el usuario.
+ * Provee la relación global de contratos asociados al conjunto de propiedades del arrendador.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const getOwnerReservations = async (req, res, next) => {
     try {
@@ -362,13 +371,17 @@ const getOwnerReservations = async (req, res, next) => {
 
         res.json({ reservas });
     } catch (error) {
+        logger.error('ReservationController', 'Recopilación dependiente falló abruptamente sobre métricas dueñas.', error);
         next(error);
     }
 }
 
 /**
- * 5. Get Reservation By ID
- * Detalle completo de una reserva (para el dueño o el cliente)
+ * Inspección puntual y extendida referida netamente a una entidad de reserva específica por su UUID.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const getReservationById = async (req, res, next) => {
     try {
@@ -402,26 +415,29 @@ const getReservationById = async (req, res, next) => {
         });
 
         if (!reserva) {
-            return res.status(404).json({ error: 'Reserva no encontrada' });
+            return res.status(404).json({ error: 'Mapeo ineficaz. No se han localizado registros equivalentes en memoria.' });
         }
 
-        // Verificar permisos (solo el dueño del garaje o el cliente que reservó pueden verla)
         const isOwner = reserva.garaje.id_dueno === userId;
         const isClient = reserva.id_vendedor === userId;
 
         if (!isOwner && !isClient) {
-            return res.status(403).json({ error: 'No tienes permisos para ver esta reserva' });
+            return res.status(403).json({ error: 'Condición transaccional asimétrica. Permisos insuficientes.' });
         }
 
         res.json({ reserva });
     } catch (error) {
+        logger.error('ReservationController', 'No se resolvió la referencia explícita del activo de alquiler.', error);
         next(error);
     }
 }
 
 /**
- * 6. Aprobar Solicitud para Chat (Dueño de Garaje)
- * Pasa de PENDIENTE a EN_NEGOCIACION.
+ * Alteración estructural del ciclo de vida a la fase de mediación consensuada (Negociación).
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const acceptForChat = async (req, res, next) => {
     try {
@@ -434,11 +450,11 @@ const acceptForChat = async (req, res, next) => {
         });
 
         if (!reserva || reserva.garaje.id_dueno !== id_dueno) {
-            return res.status(403).json({ error: 'Reserva no encontrada o no tienes permisos' });
+            return res.status(403).json({ error: 'Se exigen privilegios delegados sobre la entidad base.' });
         }
 
         if (reserva.estado !== 'PENDIENTE') {
-            return res.status(400).json({ error: `La solicitud debe estar en PENDIENTE. Estado actual: ${reserva.estado}` });
+            return res.status(400).json({ error: `La condición sistémica actual es antinómica al progreso pretendido:` });
         }
 
         const updatedReserva = await prisma.reserva.update({
@@ -446,19 +462,25 @@ const acceptForChat = async (req, res, next) => {
             data: { estado: 'EN_NEGOCIACION' }
         });
 
+        logger.info('ReservationController', `El espacio P2P de comunicación mutua queda formalmente liberado para: ${idReserva}`);
+
         res.json({
-            message: 'Solicitud aprobada para negociar. Ahora ambos pueden charlar.',
+            message: 'Estatus operacional transformado sin disrupción. Canal asimétrico provisto.',
             reserva: updatedReserva
         });
 
     } catch (error) {
+        logger.error('ReservationController', 'Error en el escalado posicional del objeto arrendaticio.', error);
         next(error);
     }
 }
 
 /**
- * 6.5 Confirmar Reserva Final (Dueño de Garaje)
- * Pasa de EN_NEGOCIACION a ACEPTADA (lista para pagar).
+ * Convalidación directiva del acuerdo, preparando el entorno para ejecución de saldos.
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const confirmReservation = async (req, res, next) => {
     try {
@@ -471,11 +493,11 @@ const confirmReservation = async (req, res, next) => {
         });
 
         if (!reserva || reserva.garaje.id_dueno !== id_dueno) {
-            return res.status(403).json({ error: 'Reserva no encontrada o no tienes permisos' });
+            return res.status(403).json({ error: 'Delegación de propiedad sin efecto en este ámbito.' });
         }
 
         if (!['PENDIENTE', 'EN_NEGOCIACION'].includes(reserva.estado)) {
-            return res.status(400).json({ error: `No se puede confirmar una reserva en estado ${reserva.estado}` });
+            return res.status(400).json({ error: `Atributo cíclico invalido para esta acción: ${reserva.estado}` });
         }
 
         const updatedReserva = await prisma.reserva.update({
@@ -483,18 +505,25 @@ const confirmReservation = async (req, res, next) => {
             data: { estado: 'ACEPTADA' }
         });
 
+        logger.info('ReservationController', `Avenencia comercial mutua estabilizada sobre reserva: ${idReserva}`);
+
         res.json({
-            message: 'Reserva conformada exitosamente. El cliente ahora puede proceder al pago.',
+            message: 'Mutuo entendimiento suscrito. Disposición lista para la enajenación financiera.',
             reserva: updatedReserva
         });
 
     } catch (error) {
+        logger.error('ReservationController', 'Trunca generalizada al asegurar variables contractuales de reserva.', error);
         next(error);
     }
 }
 
 /**
- * 7. Rechazar/Cancelar Reserva (Dueño o Cliente)
+ * Desestima procedimentalmente los efectos jurídicos e impositivos del contrato en curso, forzando estado "CANCELADA".
+ * 
+ * @param {import('express').Request} req - Petición HTTP.
+ * @param {import('express').Response} res - Respuesta HTTP.
+ * @param {import('express').NextFunction} next - Siguiente middleware.
  */
 const rejectReservation = async (req, res, next) => {
     try {
@@ -507,18 +536,18 @@ const rejectReservation = async (req, res, next) => {
         });
 
         if (!reserva) {
-            return res.status(404).json({ error: 'Reserva no encontrada' });
+            return res.status(404).json({ error: 'Omisión detectada; activo no listado en jerarquía.' });
         }
 
         const isOwner = reserva.garaje.id_dueno === userId;
         const isClient = reserva.id_vendedor === userId;
 
         if (!isOwner && !isClient) {
-            return res.status(403).json({ error: 'No tienes permisos para esta acción' });
+            return res.status(403).json({ error: 'Suspensión denegada por jerarquización deficiente.' });
         }
 
         if (['PAGADA', 'EN_CURSO', 'COMPLETADA'].includes(reserva.estado)) {
-            return res.status(400).json({ error: 'No se puede rechazar una reserva que ya ha sido pagada o está en curso.' });
+            return res.status(400).json({ error: 'Naturaleza irrevocable; ciclo mercantil se encuentra ya cerrado o respaldado en curso orgánico.' });
         }
 
         const updatedReserva = await prisma.reserva.update({
@@ -526,12 +555,15 @@ const rejectReservation = async (req, res, next) => {
             data: { estado: 'CANCELADA' }
         });
 
+        logger.info('ReservationController', `Extinción prematura del instrumento de concesión lograda: ${idReserva}`);
+
         res.json({
-            message: 'Reserva cancelada/rechazada exitosamente.',
+            message: 'Sustitución de estridencias finalizada. Se invalida el alcance presente.',
             reserva: updatedReserva
         });
 
     } catch (error) {
+        logger.error('ReservationController', 'Condición caótica durante invalidación paramétrica.', error);
         next(error);
     }
 }
