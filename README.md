@@ -1,96 +1,347 @@
-# GarajeUCB - Backend API
+# GarageSale — Backend API
 
-## Descripción
+> Sistema de alquiler de espacios comerciales temporales para ferias en Bolivia.
+> API REST + WebSockets construida con Node.js, Express, Prisma y PostgreSQL/PostGIS.
 
-Sistema backend para una plataforma de alquiler de garajes y espacios comerciales entre particulares. Permite a los dueños publicar sus garajes disponibles y a los arrendatarios reservar espacios para comercializar sus productos. Incluye gestión de pagos, chat en tiempo real, verificación de identidad (KYC) y un sistema de soporte con disputas y calificaciones.
+---
 
-## Objetivo General
+## 🚀 Producción (Render.com)
 
-Proveer una API REST robusta y segura que gestione el ciclo completo de alquiler de garajes: desde el registro y verificación de usuarios hasta la reserva, pago, operación (check-in/check-out), finanzas y soporte.
+La API está desplegada en:
 
-## Objetivos Específicos
-
-- Implementar una API REST con más de 25 endpoints funcionales organizados en módulos.
-- Persistir datos en PostgreSQL utilizando Prisma ORM con más de 20 modelos relacionales.
-- Implementar autenticación JWT con verificación KYC obligatoria y soporte para inicio de sesión de Google (Firebase).
-- Integrar chat en tiempo real con Socket.io y almacenamiento de adjuntos en Cloudflare R2.
-- Implementar sistema financiero con billetera virtual, retenciones y retiros.
-- Documentar la API automáticamente con Swagger/OpenAPI en la ruta designada.
-
-## Alcance
-
-**Secciones Incluidas:**
-- CRUD de usuarios con registro, login, autenticación con Google y verificación KYC.
-- Gestión completa de garajes (horarios semanales, servicios adicionales, imágenes, fechas bloqueadas).
-- Búsqueda de garajes disponibles por fecha y horario.
-- Sistema de reservas con fechas, categorías y servicios adicionales.
-- Procesamiento de pagos con verificación de comprobante.
-- Operaciones de check-in y check-out con evidencias fotográficas estructuradas.
-- Billetera virtual con control de saldo disponible y retenido, con operaciones de retiro financiero.
-- Chat bidireccional en tiempo real con historial y gestión de imágenes adjuntas.
-- Sistema integral de soporte, gestión de tickets y calificaciones.
-- Panel de control administrativo para aprobación de retiros y documentación KYC.
-
-## Stack Tecnológico
-
-| Tecnología | Rol Arquitectónico |
-|---|---|
-| Node.js + Express 5 | Servidor HTTP y enrutamiento REST API |
-| PostgreSQL | Proveedor de base de datos relacional |
-| Prisma 5 | Mapeo Objeto-Relacional y migraciones estructurales |
-| JWT + bcryptjs | Sistema de encriptación y tokens de acceso de sesión |
-| Firebase Admin SDK | Verificación de identidad delegada por Google Auth |
-| Socket.io | Infraestructura de comunicación en tiempo real |
-| Cloudflare R2 + AWS S3 SDK | Bucket de almacenamiento de objetos estáticos seguro |
-| Swagger UI Express | Estandarización y documentación de endpoints |
-
-## Arquitectura del Sistema
-
-```text
-Cliente (Plataforma Móvil)
-        │
-        ▼
-   Servidor REST API (Express) ◄──► WebSockets (Socket.io)
-        │
-        ▼
-  Capa de Persistencia (Prisma ORM ── PostgreSQL)
-        │
-        ▼
-  Servicios Externos (Cloudflare R2 Bucket)
+```
+https://garaje-backend.onrender.com
 ```
 
-**Flujo Operativo Estándar:**
-1. Registro de identidad (incluyendo proceso de seguridad KYC).
-2. Proceso de validación a nivel administrativo central.
-3. El arrendador publica oferta; el arrendatario interactúa vía motor de búsqueda.
-4. Generación de contrato transaccional (reserva) y confirmación de pago.
-5. Ejecución del período contractual con registros fotográficos obligatorios (check-in / check-out).
-6. Liquidación de obligaciones financieras desde saldo retenido a saldo disponible del arrendador.
-7. Opciones de retiro de capital para los arrendadores.
-8. Evaluación bilateral de calidad del servicio post-transacción.
+**Documentación interactiva (Swagger UI):**
 
-## Entorno de Ejecución
+```
+https://garaje-backend.onrender.com/api-docs
+```
 
-1. **Clonar repositorio y dependencias**
-   ```bash
-   git clone [url-del-repositorio]
-   cd backend_garajes
-   npm install
-   ```
+> ⚠️ El plan gratuito de Render hiberna el servidor tras 15 minutos de inactividad.
+> La primera petición puede tardar ~30 segundos en "despertar" el servicio.
 
-2. **Inicializar esquema de base de datos**
-   ```bash
-   npx prisma migrate deploy
-   npx prisma generate
-   ```
+---
 
-3. **Ejecución en Entorno Local**
-   ```bash
-   npm run dev
-   ```
+## 🛠️ Stack Tecnológico
 
-El proyecto se basa en la definición de variables de entorno estándar especificadas en la plantilla `.env.example`.
+| Tecnología | Rol |
+|---|---|
+| Node.js v20 + Express v5 | Servidor HTTP y enrutamiento REST |
+| PostgreSQL + PostGIS | Base de datos relacional con soporte geoespacial |
+| Prisma ORM v5 | Migrations y acceso a datos |
+| JWT + bcryptjs | Autenticación stateless y hashing de contraseñas |
+| Google OAuth 2.0 | Login social via `google-auth-library` |
+| Socket.IO v4 | Chat y notificaciones en tiempo real |
+| Cloudflare R2 | Almacenamiento de archivos (bucket público + privado) |
+| Swagger UI Express | Documentación auto-generada de la API |
+| Helmet + CORS + Rate Limit | Seguridad HTTP multicapa |
 
-## Equipo de Integración
+---
 
-- **Gabriel Mamani**: Arquitectura Backend
+## 📦 Instalación y ejecución local
+
+### 1. Clonar el repositorio
+
+```bash
+git clone https://github.com/GaboMV/GarajeBackend.git
+cd GarajeBackend
+npm install
+```
+
+### 2. Configurar variables de entorno
+
+```bash
+cp .env.example .env
+```
+
+Edita `.env` con tus valores:
+
+```env
+DATABASE_URL="postgresql://postgres:tu_password@localhost:5432/garajes_db?schema=public"
+PORT=3000
+JWT_SECRET=un_secreto_muy_seguro_aqui
+
+# Cloudflare R2
+R2_ACCOUNT_ID=tu_account_id
+R2_ACCESS_KEY_ID=tu_access_key
+R2_SECRET_ACCESS_KEY=tu_secret_key
+R2_BUCKET_PUBLIC=garajes-public
+R2_BUCKET_PRIVATE=garajes-private
+R2_PUBLIC_URL=https://pub-xxxxxxxx.r2.dev
+
+# Google OAuth 2.0 (Google Cloud Console)
+GOOGLE_CLIENT_ID=xxxx.apps.googleusercontent.com
+
+# CORS
+FRONTEND_URL=http://localhost:3000
+```
+
+### 3. Inicializar la base de datos
+
+```bash
+npx prisma generate
+npx prisma migrate deploy
+```
+
+> Requiere PostgreSQL 15+ con la extensión **PostGIS** instalada.
+
+### 4. Iniciar el servidor
+
+```bash
+npm run dev
+```
+
+El servidor arranca en: `http://localhost:3000`
+
+Documentación Swagger local: `http://localhost:3000/api-docs`
+
+---
+
+## 🌐 Cómo hacer peticiones
+
+### Registro de usuario
+
+**Local:**
+```http
+POST http://localhost:3000/api/users/register
+Content-Type: application/json
+
+{
+  "correo": "usuario@example.com",
+  "password": "mi_password_seguro",
+  "nombre_completo": "Juan Pérez"
+}
+```
+
+**Producción (Render):**
+```http
+POST https://garaje-backend.onrender.com/api/users/register
+Content-Type: application/json
+
+{
+  "correo": "usuario@example.com",
+  "password": "mi_password_seguro",
+  "nombre_completo": "Juan Pérez"
+}
+```
+
+---
+
+### Login
+
+**Local:**
+```http
+POST http://localhost:3000/api/users/login
+Content-Type: application/json
+
+{
+  "correo": "usuario@example.com",
+  "password": "mi_password_seguro"
+}
+```
+
+**Producción (Render):**
+```http
+POST https://garaje-backend.onrender.com/api/users/login
+Content-Type: application/json
+
+{
+  "correo": "usuario@example.com",
+  "password": "mi_password_seguro"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "usuario": {
+    "id": "uuid",
+    "correo": "usuario@example.com",
+    "esta_verificado": "NO_VERIFICADO"
+  }
+}
+```
+
+---
+
+### Peticiones autenticadas
+
+Todas las rutas protegidas requieren enviar el token JWT en el header:
+
+**Local:**
+```http
+GET http://localhost:3000/api/users/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Producción (Render):**
+```http
+GET https://garaje-backend.onrender.com/api/users/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+---
+
+### Búsqueda geoespacial de garajes
+
+**Local:**
+```http
+GET http://localhost:3000/api/search?fecha=2026-04-15&hora_inicio=09:00&hora_fin=13:00&lat=-16.5&lng=-68.15&radio_km=5
+Authorization: Bearer <token>
+```
+
+**Producción (Render):**
+```http
+GET https://garaje-backend.onrender.com/api/search?fecha=2026-04-15&hora_inicio=09:00&hora_fin=13:00&lat=-16.5&lng=-68.15&radio_km=5
+Authorization: Bearer <token>
+```
+
+---
+
+### Crear una reserva
+
+**Local:**
+```http
+POST http://localhost:3000/api/reservations
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "id_garaje": "uuid-del-garaje",
+  "tipo_cobro": "POR_HORA",
+  "mensaje_inicial": "Hola, me interesa el espacio",
+  "acepto_terminos_responsabilidad": true,
+  "fechas": [
+    {
+      "fecha": "2026-04-15",
+      "hora_inicio": "09:00",
+      "hora_fin": "13:00"
+    }
+  ]
+}
+```
+
+**Producción (Render):**
+```http
+POST https://garaje-backend.onrender.com/api/reservations
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "id_garaje": "uuid-del-garaje",
+  "tipo_cobro": "POR_HORA",
+  "mensaje_inicial": "Hola, me interesa el espacio",
+  "acepto_terminos_responsabilidad": true,
+  "fechas": [
+    {
+      "fecha": "2026-04-15",
+      "hora_inicio": "09:00",
+      "hora_fin": "13:00"
+    }
+  ]
+}
+```
+
+---
+
+## 🔌 Conexión WebSocket (Chat en tiempo real)
+
+```javascript
+// Usando socket.io-client
+const socket = io("https://garaje-backend.onrender.com", {
+  // Para local: io("http://localhost:3000", { ... })
+  auth: { token: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." }
+});
+
+// Unirse al chat de una reserva
+socket.emit("join_room", { reservaId: "uuid-de-la-reserva" });
+
+// Enviar mensaje
+socket.emit("send_message", {
+  reservaId: "uuid-de-la-reserva",
+  contenido: "Hola, ¿a qué hora llegas?"
+});
+
+// Recibir mensajes en tiempo real
+socket.on("receive_message", (mensaje) => {
+  console.log(mensaje.contenido);
+});
+```
+
+---
+
+## 📋 Endpoints principales
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| POST | `/api/users/register` | Registro de usuario |
+| POST | `/api/users/login` | Login con JWT |
+| POST | `/api/users/google` | Login con Google OAuth 2.0 |
+| POST | `/api/users/kyc` | Subir documentos de identidad |
+| POST | `/api/garages` | Publicar garaje |
+| GET | `/api/search` | Búsqueda geoespacial de garajes |
+| POST | `/api/reservations` | Crear reserva |
+| POST | `/api/reservations/:id/pagar` | Registrar pago |
+| POST | `/api/operations/:id/check-in` | Check-in |
+| POST | `/api/operations/:id/check-out` | Check-out y liberar fondos |
+| GET | `/api/finances/billetera` | Consultar billetera |
+| GET | `/api/chat/:id/mensajes` | Historial de chat |
+| GET | `/api/notifications` | Notificaciones |
+
+> Ver todos los endpoints en Swagger UI: `https://garaje-backend.onrender.com/api-docs`
+
+---
+
+## 🏗️ Arquitectura
+
+```
+┌─────────────────────────────────────┐
+│   Cliente Móvil (Flutter)           │
+└──────────────┬──────────────────────┘
+               │ HTTP REST + WebSocket
+┌──────────────▼──────────────────────┐
+│   Express API (Render.com)          │
+│   ├── routes/         (47 endpoints)│
+│   ├── controllers/    (lógica)      │
+│   ├── middlewares/    (auth/segur.) │
+│   └── socket/         (Socket.IO)  │
+└──────────────┬──────────────────────┘
+               │ Prisma ORM
+┌──────────────▼──────────────────────┐
+│   PostgreSQL + PostGIS (Neon.tech)  │
+└──────────────┬──────────────────────┘
+               │ AWS SDK S3-compatible
+┌──────────────▼──────────────────────┐
+│   Cloudflare R2                     │
+│   ├── Bucket Público  (fotos)       │
+│   └── Bucket Privado  (KYC/docs)   │
+└─────────────────────────────────────┘
+```
+
+---
+
+## 🔐 Variables de entorno requeridas
+
+| Variable | Descripción |
+|---|---|
+| `DATABASE_URL` | Cadena de conexión PostgreSQL |
+| `JWT_SECRET` | Clave secreta para firmar tokens JWT |
+| `GOOGLE_CLIENT_ID` | Client ID de Google Cloud Console |
+| `R2_ACCOUNT_ID` | ID de cuenta Cloudflare |
+| `R2_ACCESS_KEY_ID` | Clave de acceso R2 |
+| `R2_SECRET_ACCESS_KEY` | Clave secreta R2 |
+| `R2_BUCKET_PUBLIC` | Nombre del bucket público |
+| `R2_BUCKET_PRIVATE` | Nombre del bucket privado |
+| `R2_PUBLIC_URL` | URL pública del CDN de R2 |
+| `FRONTEND_URL` | Origen permitido por CORS |
+| `PORT` | Puerto del servidor (default: 3000) |
+
+---
+
+## 👤 Autor
+
+**Gabriel Mamani** — Arquitectura Full Stack Backend
+Universidad Católica Boliviana "San Pablo" · La Paz, 2026
