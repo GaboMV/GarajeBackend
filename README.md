@@ -1,46 +1,46 @@
-# GarageSale — Backend API
+# GarageSale - Backend API
 
 > Sistema de alquiler de espacios comerciales temporales para ferias en Bolivia.
 > API REST + WebSockets construida con Node.js, Express, Prisma y PostgreSQL/PostGIS.
 
 ---
 
-## 🚀 Producción (Render.com)
+## Produccion (Render.com)
 
-La API está desplegada en:
+La API esta desplegada en:
 
 ```
 https://garaje-backend.onrender.com
 ```
 
-**Documentación interactiva (Swagger UI):**
+**Documentacion interactiva (Swagger UI):**
 
 ```
 https://garaje-backend.onrender.com/api-docs
 ```
 
-> ⚠️ El plan gratuito de Render hiberna el servidor tras 15 minutos de inactividad.
-> La primera petición puede tardar ~30 segundos en "despertar" el servicio.
+> Aviso: El plan gratuito de Render hiberna el servidor tras 15 minutos de inactividad.
+> La primera peticion puede tardar ~30 segundos en "despertar" el servicio.
 
 ---
 
-## 🛠️ Stack Tecnológico
+## Stack Tecnologico
 
-| Tecnología | Rol |
+| Tecnologia | Rol |
 |---|---|
 | Node.js v20 + Express v5 | Servidor HTTP y enrutamiento REST |
 | PostgreSQL + PostGIS | Base de datos relacional con soporte geoespacial |
 | Prisma ORM v5 | Migrations y acceso a datos |
-| JWT + bcryptjs | Autenticación stateless y hashing de contraseñas |
-| Google OAuth 2.0 | Login social via `google-auth-library` |
+| JWT + bcryptjs | Autenticacion stateless y hashing de contraseñas |
+| Google OAuth 2.0 | Login social via google-auth-library |
 | Socket.IO v4 | Chat y notificaciones en tiempo real |
-| Cloudflare R2 | Almacenamiento de archivos (bucket público + privado) |
-| Swagger UI Express | Documentación auto-generada de la API |
+| Cloudflare R2 | Almacenamiento de archivos (bucket publico + privado) |
+| Swagger UI Express | Documentacion auto-generada de la API |
 | Helmet + CORS + Rate Limit | Seguridad HTTP multicapa |
 
 ---
 
-## 📦 Instalación y ejecución local
+## Instalacion y ejecucion local
 
 ### 1. Clonar el repositorio
 
@@ -56,7 +56,7 @@ npm install
 cp .env.example .env
 ```
 
-Edita `.env` con tus valores:
+Edita .env con tus valores:
 
 ```env
 DATABASE_URL="postgresql://postgres:tu_password@localhost:5432/garajes_db?schema=public"
@@ -85,7 +85,7 @@ npx prisma generate
 npx prisma migrate deploy
 ```
 
-> Requiere PostgreSQL 15+ con la extensión **PostGIS** instalada.
+> Requiere PostgreSQL 15+ con la extension PostGIS instalada.
 
 ### 4. Iniciar el servidor
 
@@ -93,13 +93,13 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-El servidor arranca en: `http://localhost:3000`
+El servidor arranca en: http://localhost:3000
 
-Documentación Swagger local: `http://localhost:3000/api-docs`
+Documentacion Swagger local: http://localhost:3000/api-docs
 
 ---
 
-## 🌐 Cómo hacer peticiones
+## Como hacer peticiones
 
 ### Registro de usuario
 
@@ -111,11 +111,11 @@ Content-Type: application/json
 {
   "correo": "usuario@example.com",
   "password": "mi_password_seguro",
-  "nombre_completo": "Juan Pérez"
+  "nombre_completo": "Juan Perez"
 }
 ```
 
-**Producción (Render):**
+**Produccion (Render):**
 ```http
 POST https://garaje-backend.onrender.com/api/users/register
 Content-Type: application/json
@@ -123,7 +123,7 @@ Content-Type: application/json
 {
   "correo": "usuario@example.com",
   "password": "mi_password_seguro",
-  "nombre_completo": "Juan Pérez"
+  "nombre_completo": "Juan Perez"
 }
 ```
 
@@ -142,7 +142,7 @@ Content-Type: application/json
 }
 ```
 
-**Producción (Render):**
+**Produccion (Render):**
 ```http
 POST https://garaje-backend.onrender.com/api/users/login
 Content-Type: application/json
@@ -177,7 +177,7 @@ GET http://localhost:3000/api/users/profile
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-**Producción (Render):**
+**Produccion (Render):**
 ```http
 GET https://garaje-backend.onrender.com/api/users/profile
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -185,7 +185,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-### Búsqueda geoespacial de garajes
+### Busqueda geoespacial de garajes
 
 **Local:**
 ```http
@@ -193,7 +193,7 @@ GET http://localhost:3000/api/search?fecha=2026-04-15&hora_inicio=09:00&hora_fin
 Authorization: Bearer <token>
 ```
 
-**Producción (Render):**
+**Produccion (Render):**
 ```http
 GET https://garaje-backend.onrender.com/api/search?fecha=2026-04-15&hora_inicio=09:00&hora_fin=13:00&lat=-16.5&lng=-68.15&radio_km=5
 Authorization: Bearer <token>
@@ -224,7 +224,7 @@ Content-Type: application/json
 }
 ```
 
-**Producción (Render):**
+**Produccion (Render):**
 ```http
 POST https://garaje-backend.onrender.com/api/reservations
 Authorization: Bearer <token>
@@ -247,7 +247,7 @@ Content-Type: application/json
 
 ---
 
-## 🔌 Conexión WebSocket (Chat en tiempo real)
+## Conexion WebSocket (Chat en tiempo real)
 
 ```javascript
 // Usando socket.io-client
@@ -262,7 +262,7 @@ socket.emit("join_room", { reservaId: "uuid-de-la-reserva" });
 // Enviar mensaje
 socket.emit("send_message", {
   reservaId: "uuid-de-la-reserva",
-  contenido: "Hola, ¿a qué hora llegas?"
+  contenido: "Hola, ¿a que hora llegas?"
 });
 
 // Recibir mensajes en tiempo real
@@ -273,39 +273,39 @@ socket.on("receive_message", (mensaje) => {
 
 ---
 
-## 📋 Endpoints principales
+## Endpoints principales
 
-| Método | Endpoint | Descripción |
+| Metodo | Endpoint | Descripcion |
 |---|---|---|
-| POST | `/api/users/register` | Registro de usuario |
-| POST | `/api/users/login` | Login con JWT |
-| POST | `/api/users/google` | Login con Google OAuth 2.0 |
-| POST | `/api/users/kyc` | Subir documentos de identidad |
-| POST | `/api/garages` | Publicar garaje |
-| GET | `/api/search` | Búsqueda geoespacial de garajes |
-| POST | `/api/reservations` | Crear reserva |
-| POST | `/api/reservations/:id/pagar` | Registrar pago |
-| POST | `/api/operations/:id/check-in` | Check-in |
-| POST | `/api/operations/:id/check-out` | Check-out y liberar fondos |
-| GET | `/api/finances/billetera` | Consultar billetera |
-| GET | `/api/chat/:id/mensajes` | Historial de chat |
-| GET | `/api/notifications` | Notificaciones |
+| POST | /api/users/register | Registro de usuario |
+| POST | /api/users/login | Login con JWT |
+| POST | /api/users/google | Login con Google OAuth 2.0 |
+| POST | /api/users/kyc | Subir documentos de identidad |
+| POST | /api/garages | Publicar garaje |
+| GET | /api/search | Busqueda geoespacial de garajes |
+| POST | /api/reservations | Crear reserva |
+| POST | /api/reservations/:id/pagar | Registrar pago |
+| POST | /api/operations/:id/check-in | Check-in |
+| POST | /api/operations/:id/check-out | Check-out y liberar fondos |
+| GET | /api/finances/billetera | Consultar billetera |
+| GET | /api/chat/:id/mensajes | Historial de chat |
+| GET | /api/notifications | Notificaciones |
 
-> Ver todos los endpoints en Swagger UI: `https://garaje-backend.onrender.com/api-docs`
+> Ver todos los endpoints en Swagger UI: https://garaje-backend.onrender.com/api-docs
 
 ---
 
-## 🏗️ Arquitectura
+## Arquitectura
 
 ```
 ┌─────────────────────────────────────┐
-│   Cliente Móvil (Flutter)           │
+│   Cliente Movil (Flutter)           │
 └──────────────┬──────────────────────┘
                │ HTTP REST + WebSocket
 ┌──────────────▼──────────────────────┐
 │   Express API (Render.com)          │
 │   ├── routes/         (47 endpoints)│
-│   ├── controllers/    (lógica)      │
+│   ├── controllers/    (logica)      │
 │   ├── middlewares/    (auth/segur.) │
 │   └── socket/         (Socket.IO)  │
 └──────────────┬──────────────────────┘
@@ -316,32 +316,32 @@ socket.on("receive_message", (mensaje) => {
                │ AWS SDK S3-compatible
 ┌──────────────▼──────────────────────┐
 │   Cloudflare R2                     │
-│   ├── Bucket Público  (fotos)       │
+│   ├── Bucket Publico  (fotos)       │
 │   └── Bucket Privado  (KYC/docs)   │
 └─────────────────────────────────────┘
 ```
 
 ---
 
-## 🔐 Variables de entorno requeridas
+## Variables de entorno requeridas
 
-| Variable | Descripción |
+| Variable | Descripcion |
 |---|---|
-| `DATABASE_URL` | Cadena de conexión PostgreSQL |
-| `JWT_SECRET` | Clave secreta para firmar tokens JWT |
-| `GOOGLE_CLIENT_ID` | Client ID de Google Cloud Console |
-| `R2_ACCOUNT_ID` | ID de cuenta Cloudflare |
-| `R2_ACCESS_KEY_ID` | Clave de acceso R2 |
-| `R2_SECRET_ACCESS_KEY` | Clave secreta R2 |
-| `R2_BUCKET_PUBLIC` | Nombre del bucket público |
-| `R2_BUCKET_PRIVATE` | Nombre del bucket privado |
-| `R2_PUBLIC_URL` | URL pública del CDN de R2 |
-| `FRONTEND_URL` | Origen permitido por CORS |
-| `PORT` | Puerto del servidor (default: 3000) |
+| DATABASE_URL | Cadena de conexion PostgreSQL |
+| JWT_SECRET | Clave secreta para firmar tokens JWT |
+| GOOGLE_CLIENT_ID | Client ID de Google Cloud Console |
+| R2_ACCOUNT_ID | ID de cuenta Cloudflare |
+| R2_ACCESS_KEY_ID | Clave de acceso R2 |
+| R2_SECRET_ACCESS_KEY | Clave secreta R2 |
+| R2_BUCKET_PUBLIC | Nombre del bucket publico |
+| R2_BUCKET_PRIVATE | Nombre del bucket privado |
+| R2_PUBLIC_URL | URL publica del CDN de R2 |
+| FRONTEND_URL | Origen permitido por CORS |
+| PORT | Puerto del servidor (default: 3000) |
 
 ---
 
-## 👤 Autor
+## Autor
 
-**Gabriel Mamani** — Arquitectura Full Stack Backend
-Universidad Católica Boliviana "San Pablo" · La Paz, 2026
+**Gabriel Mamani** - Arquitectura Full Stack Backend
+Universidad Catolica Boliviana "San Pablo" - La Paz, 2026
